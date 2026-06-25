@@ -176,7 +176,7 @@ export class Reports implements OnInit {
     const totalScore = grades.reduce((s, g) => s + g.score, 0);
     const totalMax = grades.reduce((s, g) => s + g.maxScore, 0);
     const n = grades.length;
-    return { totalScore, totalMax, subjectCount: n };
+    return { totalScore: Math.round(totalScore * 10) / 10, totalMax: Math.round(totalMax * 10) / 10, subjectCount: n };
   });
 
   private aiBase = buildApiUrl('ai/reports');

@@ -159,13 +159,13 @@
                               <td>{{ item.subjectName }}</td>
                               <td>
                                 <span class="sgrade sgrade-prev">
-                                  @if (item.prevGrade) { {{ item.prevGrade.score }}/{{ item.prevGrade.maxScore }} }
+                                  @if (item.prevGrade) { {{ item.prevGrade.score | number:'1.1-1' }}/{{ item.prevGrade.maxScore | number:'1.1-1' }} }
                                   @else { - }
                                 </span>
                               </td>
                               <td>
                                 <span class="sgrade sgrade-curr">
-                                  @if (item.currGrade) { {{ item.currGrade.score }}/{{ item.currGrade.maxScore }} }
+                                  @if (item.currGrade) { {{ item.currGrade.score | number:'1.1-1' }}/{{ item.currGrade.maxScore | number:'1.1-1' }} }
                                   @else { - }
                                 </span>
                               </td>
@@ -344,7 +344,7 @@
                       <div class="subject-info">
                         <span class="subject-name">{{ s.subjectName }}</span>
                         <span class="subject-score" [style.color]="getSubjectBarColor((s.score / s.maxScore) * 100)">
-                          {{ s.score }}/{{ s.maxScore }}
+                          {{ s.score | number:'1.1-1' }}/{{ s.maxScore | number:'1.1-1' }}
                         </span>
                       </div>
                       <div class="subject-bar-track">
