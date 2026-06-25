@@ -1,5 +1,7 @@
-﻿using AutoMapper;
+﻿using System.Text.Json;
+using AutoMapper;
 using Common.Results;
+using Project.BLL.AI.Interfaces;
 using Project.BLL.DTOs.ExamAttempt;
 using Project.BLL.Interfaces;
 using Project.BLL.Utils;
@@ -13,11 +15,13 @@ namespace Project.BLL.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly ILLMRouter _llmRouter;
 
-        public ExamAttemptService(IUnitOfWork unitOfWork, IMapper mapper)
+        public ExamAttemptService(IUnitOfWork unitOfWork, IMapper mapper, ILLMRouter llmRouter)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _llmRouter = llmRouter;
         }
 
         public async Task<OperationResult<GetExamAttemptDto>> GetByIdAsync(int id)
@@ -321,7 +325,150 @@ namespace Project.BLL.Services
         }
 
         /// <summary>
-        /// التحقق من صلاحية المعلم على امتحان:
+        /// تصحيح الأسئلة المقالية وأكمل-الفراغ باستخدام AI.
+        /// يبني برومبت لـ LLM مع كل سؤال + إجابة الطالب + الإجابة النموذجية + الدرجة القصوى
+        /// ويطلب اقتراح درجة لكل سؤال مع مبرر مختصر.
+        /// </summary>
+        public async Task<OperationResult<AiGradeResponseDto>> AiGradeSuggestionsAsync(int attemptId, int teacherId)
+        {
+            var attempt = await _unitOfWork.StudentExamAttempts
+                .GetWithAnswersAsync(attemptId, CancellationToken.None);
+
+            if (attempt == null || attempt.IsDeleted)
+                return OperationResult<AiGradeResponseDto>.Failure("المحاولة غير موجودة", 404);
+
+            if (attempt.SubmittedAt == null)
+                return OperationResult<AiGradeResponseDto>.Failure("لم يتم تقديم المحاولة بعد");
+
+            // فحص صلاحية المعلم
+            var examForAuth = await _unitOfWork.Exams.GetWithClassSubjectTeacherAsync(attempt.ExamId);
+            if (examForAuth == null)
+                return OperationResult<AiGradeResponseDto>.Failure("الامتحان غير موجود", 404);
+
+            var authorized = await IsTeacherAuthorizedForExamAsync(examForAuth, teacherId);
+            if (!authorized)
+                return OperationResult<AiGradeResponseDto>.Failure("غير مصرح لك بتصحيح هذه المحاولة", 403);
+
+            var exam = await _unitOfWork.Exams.GetWithQuestionsAsync(attempt.ExamId, CancellationToken.None);
+            if (exam == null)
+                return OperationResult<AiGradeResponseDto>.Failure("الامتحان غير موجود", 404);
+
+            // تجميع الأسئلة المقالية وأكمل-الفراغ فقط
+            var manualQuestions = exam.Questions
+                .Where(q => q.QuestionType == QuestionType.Essay || q.QuestionType == QuestionType.FillBlank)
+                .ToList();
+
+            if (manualQuestions.Count == 0)
+                return OperationResult<AiGradeResponseDto>.Failure("لا توجد أسئلة مقالية أو أكمل-فراغ في هذا الامتحان");
+
+            // بناء قائمة الأسئلة للـ LLM
+            var questionsForAi = new List<object>();
+            foreach (var question in manualQuestions)
+            {
+                var answer = attempt.Answers.FirstOrDefault(a => a.QuestionId == question.Id);
+                if (answer == null) continue;
+
+                questionsForAi.Add(new
+                {
+                    answerId = answer.Id,
+                    questionText = question.QuestionText,
+                    studentAnswer = answer.AnswerText ?? "(لم يجب)",
+                    correctAnswer = question.CorrectAnswer ?? "(غير محدد)",
+                    maxPoints = (double)question.Points
+                });
+            }
+
+            if (questionsForAi.Count == 0)
+                return OperationResult<AiGradeResponseDto>.Failure("لم يتم العثور على إجابات للتصحيح");
+
+            // بناء البرومبت
+            var jsonQuestions = JsonSerializer.Serialize(questionsForAi, new JsonSerializerOptions { WriteIndented = true });
+
+            var systemPrompt = @"أنت معلم خبير في التصحيح والتقييم. مهمتك هي تقييم إجابات الطلاب للأسئلة المقالية وأسئلة أكمل-الفراغ.
+
+لكل سؤال، ستحصل على:
+- questionText: نص السؤال
+- studentAnswer: إجابة الطالب
+- correctAnswer: الإجابة النموذجية
+- maxPoints: الدرجة القصوى للسؤال
+
+المطلوب منك:
+1. قارن إجابة الطالب بالإجابة النموذجية.
+2. قيم مدى صحة الإجابة واكتمالها.
+3. اقترح درجة من 0 إلى maxPoints بناءً على جودة الإجابة.
+4. قدم مبرراً مختصراً جداً بالعربية للتقييم (جملة واحدة).
+
+يجب أن يكون الرد بصيغة JSON Array فقط:
+[
+  {
+    ""answerId"": رقم الإجابة,
+    ""suggestedPoints"": الدرجة المقترحة (رقم عشري),
+    ""justification"": ""المبرر بالعربية""
+  }
+]
+
+لا تضف أي نص خارج الـ JSON.
+كن دقيقاً ومنصفاً في التقييم. الطالب الذي أجاب إجابة صحيحة كاملة يستحق الدرجة كاملة.";
+            var userMessage = $"قم بتقييم الإجابات التالية:\n\n{jsonQuestions}";
+
+            string llmResponse;
+            try
+            {
+                llmResponse = await _llmRouter.GenerateAsync(systemPrompt, userMessage, preferredProvider: null, ct: CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                return OperationResult<AiGradeResponseDto>.Failure($"فشل الاتصال بخدمة الذكاء الاصطناعي: {ex.Message}", 500);
+            }
+
+            // محاولة استخراج JSON من الرد
+            var json = llmResponse.Trim();
+            // قد يحيط LLM الرد بـ ```json ... ```
+            if (json.StartsWith("```"))
+            {
+                var start = json.IndexOf('\n');
+                var end = json.LastIndexOf("```");
+                if (start > 0 && end > start)
+                    json = json[(start + 1)..end].Trim();
+            }
+
+            List<AiGradeSuggestionDto>? suggestions;
+            try
+            {
+                suggestions = JsonSerializer.Deserialize<List<AiGradeSuggestionDto>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch (JsonException)
+            {
+                return OperationResult<AiGradeResponseDto>.Failure("تعذر تحليل رد الذكاء الاصطناعي، حاول مرة أخرى", 500);
+            }
+
+            if (suggestions == null || suggestions.Count == 0)
+                return OperationResult<AiGradeResponseDto>.Failure("لم يتمكن الذكاء الاصطناعي من تقديم اقتراحات، حاول مرة أخرى", 500);
+
+            // التحقق من صحة الدرجات (لا تتجاوز maxPoints)
+            foreach (var suggestion in suggestions)
+            {
+                var answer = attempt.Answers.FirstOrDefault(a => a.Id == suggestion.AnswerId);
+                if (answer == null) continue;
+                var question = exam.Questions.FirstOrDefault(q => q.Id == answer.QuestionId);
+                if (question == null) continue;
+
+                if (suggestion.SuggestedPoints < 0)
+                    suggestion.SuggestedPoints = 0;
+                if (suggestion.SuggestedPoints > (decimal)question.Points)
+                    suggestion.SuggestedPoints = (decimal)question.Points;
+            }
+
+            var result = new AiGradeResponseDto
+            {
+                AttemptId = attemptId,
+                Suggestions = suggestions
+            };
+
+            return OperationResult<AiGradeResponseDto>.Success(result, "تم الحصول على اقتراحات التصحيح بنجاح");
+        }
+
+
         ///   - CST موجود → المعلم صاحب الـ CST.
         ///   - CST=null (نشر للصف) → المعلم يُدرّس المادة (SubjectId).
         /// </summary>

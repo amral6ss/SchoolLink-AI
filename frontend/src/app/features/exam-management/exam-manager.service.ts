@@ -88,6 +88,8 @@ export interface ExamAttemptAnswerDetail {
   pointsEarned: number;
   feedback?: string;
   correctAnswerText?: string;
+  _aiSuggested?: number;      // الدرجة المقترحة من AI (محلي فقط)
+  _aiJustification?: string;  // مبرر AI (محلي فقط)
 }
 
 /** تفاصيل محاولة كاملة (لمودال التصحيح) */
@@ -108,6 +110,17 @@ export interface GradeEssayAnswerPayload {
 
 export interface GradeEssayAttemptPayload {
   answers: GradeEssayAnswerPayload[];
+}
+
+export interface AiGradeSuggestion {
+  answerId: number;
+  suggestedPoints: number;
+  justification?: string;
+}
+
+export interface AiGradeResponse {
+  attemptId: number;
+  suggestions: AiGradeSuggestion[];
 }
 
 export interface ExamDetail {
@@ -207,6 +220,12 @@ export class ExamManagerService {
   gradeEssayAnswers(attemptId: number, dto: GradeEssayAttemptPayload): Observable<OperationResult<any>> {
     return this.http.patch<OperationResult<any>>(
       `${this.attemptsBase}/${attemptId}/grade`, dto
+    );
+  }
+
+  aiGradeAttempt(attemptId: number): Observable<OperationResult<AiGradeResponse>> {
+    return this.http.post<OperationResult<AiGradeResponse>>(
+      `${this.attemptsBase}/${attemptId}/ai-grade-suggestions`, {}
     );
   }
 

@@ -27,8 +27,35 @@ public class ExamProgressDto
 {
     public int Id { get; set; }
     public string Subject { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
     public string? Date { get; set; }
     public string Status { get; set; } = string.Empty;
     public double? Score { get; set; }
     public double MaxScore { get; set; }
+}
+
+public class ChildExamAttemptResultDto
+{
+    public int ExamId { get; set; }
+    public string Subject { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public int StudentId { get; set; }
+    public string StudentName { get; set; } = string.Empty;
+    public double? Score { get; set; }
+    public double MaxScore { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public List<ChildExamAnswerDto> Answers { get; set; } = new();
+}
+
+public class ChildExamAnswerDto
+{
+    public int QuestionId { get; set; }
+    public string QuestionText { get; set; } = string.Empty;
+    public string? AnswerText { get; set; }
+    public string? CorrectAnswerText { get; set; }
+    public bool? IsCorrect { get; set; }
+    public double PointsEarned { get; set; }
+    public double QuestionPoints { get; set; }
+    public string? AIFeedback { get; set; }
 }

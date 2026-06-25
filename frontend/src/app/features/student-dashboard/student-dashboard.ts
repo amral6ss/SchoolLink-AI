@@ -15,6 +15,7 @@ import {
 import { switchMap, of, forkJoin } from 'rxjs';
 import { Chart, registerables } from 'chart.js';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 
 Chart.register(...registerables);
 
@@ -31,6 +32,7 @@ export class StudentDashboard implements OnInit, AfterViewInit, OnDestroy {
   auth = inject(AuthService);
   private service = inject(StudentDashboardService);
   private academicYearService = inject(AcademicYearService);
+  private router = inject(Router);
 
   sidebarOpen = signal(false);
   loading = signal(true);
@@ -280,4 +282,12 @@ export class StudentDashboard implements OnInit, AfterViewInit, OnDestroy {
 
   trackBySubject(_: number, s: SubjectPerformance) { return s.subjectName; }
   trackByWeek(_: number, w: WeeklyPerformance) { return w.weekNumber; }
+
+  navigateToChatAi() {
+    this.router.navigate(['/chat-ai']);
+  }
+
+  navigateToLibrary() {
+    this.router.navigate(['/digital-library']);
+  }
 }

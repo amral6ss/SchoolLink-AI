@@ -78,4 +78,14 @@ public class ExamAttemptsController : ControllerBase
             return BadRequest(result);
         return Ok(result);
     }
+
+    [Authorize(Roles = "Admin,Teacher")]
+    [HttpPost("{attemptId:int}/ai-grade-suggestions")]
+    public async Task<IActionResult> AiGradeSuggestions(int attemptId)
+    {
+        var result = await _service.AiGradeSuggestionsAsync(attemptId, GetUserId());
+        if (!result.IsSuccess)
+            return BadRequest(result);
+        return Ok(result);
+    }
 }

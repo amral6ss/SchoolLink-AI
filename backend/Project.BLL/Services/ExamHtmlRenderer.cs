@@ -395,6 +395,11 @@ body{
   font-weight:600;
   display:inline-block;
 }
+.editing .correct-answer{
+  display:block;
+  width:100%;
+}
+.editing .correct-answer textarea{width:100%!important}
 
 /* ── Edit mode ── */
 .editing .q-item{
@@ -755,7 +760,8 @@ body{
         if (caEl) {{
           var answer = caEl.dataset.answer || '';
           caEl.style.display = '';
-          caEl.innerHTML = 'الإجابة: <input type=""text"" class=""edit-input"" style=""width:70%;display:inline-block"" value=""' + escHtml(answer) + '"" id=""edit_correct_' + qid + '"" data-original=""' + escHtml(answer) + '"">';
+          caEl.innerHTML = '<div style=""font-size:12px;color:#166534;font-weight:600;margin-bottom:4px;"">الإجابة النموذجية:</div>' +
+            '<textarea class=""edit-textarea"" style=""width:100%;min-height:80px;resize:vertical;"" id=""edit_correct_' + qid + '"">' + escHtml(answer) + '</textarea>';
         }}
       }}
 

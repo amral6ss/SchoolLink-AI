@@ -5,6 +5,7 @@ import { Sidebar } from '../../layouts/sidebar/sidebar';
 import { AcademicYearService, AcademicYear } from '../../core/services/academic-year.service';
 import { GradeLevelService, GradeLevel } from '../../core/services/grade-level.service';
 import { ResultVisibilityService, ResultVisibilityDto, SetVisibilityRequest } from '../../core/services/result-visibility.service';
+import { SchoolProfileService, SchoolProfile } from '../../core/services/school-profile.service';
 
 @Component({
   selector: 'app-settings',
@@ -22,6 +23,7 @@ export class Settings implements OnInit {
   private academicYearService = inject(AcademicYearService);
   private gradeLevelService = inject(GradeLevelService);
   private resultVisibilityService = inject(ResultVisibilityService);
+  private schoolProfileService = inject(SchoolProfileService);
 
   // State
   academicYears = signal<AcademicYear[]>([]);
@@ -59,8 +61,25 @@ export class Settings implements OnInit {
     { value: 'SecondSemester', label: 'الترم الثاني' },
   ];
 
+  // ── School Profile State ──────────────────────────────────────────────────
+  schoolProfile = signal<SchoolProfile | null>(null);
+  schoolForm = {
+    schoolName: '',
+    governorate: '',
+    directorate: '',
+    educationalAdministration: '',
+    phone: '',
+    address: '',
+    email: '',
+    managerName: '',
+  };
+  schoolLoading = signal(false);
+  schoolError = signal<string | null>(null);
+  schoolSuccess = signal<string | null>(null);
+
   ngOnInit() {
     this.loadData();
+    this.loadSchoolProfile();
   }
 
   loadData() {
@@ -368,6 +387,80 @@ export class Settings implements OnInit {
 
   onTermChange() {
     this.onAcademicYearChange();
+  }
+
+  // ─── School Profile Methods ───────────────────────────────────────────────
+
+  loadSchoolProfile() {
+    this.schoolLoading.set(true);
+    this.schoolProfileService.get().subscribe({
+      next: (profile) => {
+        this.schoolLoading.set(false);
+        this.schoolProfile.set(profile);
+        this.schoolForm = {
+          schoolName: profile.schoolName || '',
+          governorate: profile.governorate || '',
+          directorate: profile.directorate || '',
+          educationalAdministration: profile.educationalAdministration || '',
+          phone: profile.phone || '',
+          address: profile.address || '',
+          email: profile.email || '',
+          managerName: profile.managerName || '',
+        };
+      },
+      error: () => {
+        this.schoolLoading.set(false);
+        // If no profile exists yet, show empty form
+        this.schoolProfile.set(null);
+        this.schoolForm = { schoolName: '', governorate: '', directorate: '', educationalAdministration: '', phone: '', address: '', email: '', managerName: '' };
+      },
+    });
+  }
+
+  saveSchoolProfile() {
+    if (!this.schoolForm.schoolName || !this.schoolForm.governorate || !this.schoolForm.directorate || !this.schoolForm.educationalAdministration) {
+      this.schoolError.set('يرجى ملء اسم المدرسة والمحافظة والإدارة التعليمية');
+      return;
+    }
+    this.schoolError.set(null);
+    this.schoolSuccess.set(null);
+    this.schoolLoading.set(true);
+
+    // تنظيف رقم الهاتف من الشرطات والمسافات للتوافق مع الـ Regex
+    const cleanPhone = this.schoolForm.phone ? this.schoolForm.phone.replace(/[-\s]/g, '') : '';
+
+    this.schoolProfileService.update({
+      schoolName: this.schoolForm.schoolName,
+      governorate: this.schoolForm.governorate,
+      directorate: this.schoolForm.directorate,
+      educationalAdministration: this.schoolForm.educationalAdministration,
+      phone: cleanPhone || undefined,
+      address: this.schoolForm.address || undefined,
+      email: this.schoolForm.email || undefined,
+      managerName: this.schoolForm.managerName || undefined,
+    }).subscribe({
+      next: (profile) => {
+        this.schoolLoading.set(false);
+        this.schoolProfile.set(profile);
+        this.showSchoolSuccess('تم حفظ الملف التعريفي للمدرسة بنجاح');
+      },
+      error: (err) => {
+        this.schoolLoading.set(false);
+        // عرض أخطاء الفاليديشن من الـ API
+        const apiErrors = err?.error?.errors;
+        if (apiErrors) {
+          const msgs = Object.values(apiErrors).flat();
+          this.schoolError.set(msgs.join(' • '));
+        } else {
+          this.schoolError.set(err?.error?.message || err?.message || 'حدث خطأ أثناء حفظ الملف التعريفي');
+        }
+      },
+    });
+  }
+
+  private showSchoolSuccess(msg: string) {
+    this.schoolSuccess.set(msg);
+    setTimeout(() => this.schoolSuccess.set(null), 3000);
   }
 
   get filteredVisibilityByYear(): ResultVisibilityDto[] {

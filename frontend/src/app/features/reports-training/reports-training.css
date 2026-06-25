@@ -39,21 +39,6 @@
   margin-top: 0.25rem;
 }
 
-.btn-export {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  background: var(--md-sys-color-surface-container-high);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-export:hover { background: var(--md-sys-color-surface-variant); }
-
 /* ─── Filters ────────────────────────────────── */
 .filters-bar {
   display: flex;

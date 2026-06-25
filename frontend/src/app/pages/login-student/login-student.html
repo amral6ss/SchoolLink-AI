@@ -19,13 +19,24 @@
           <span class="material-symbols-outlined" style="font-size:18px">visibility</span>
         </button>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 20px">
+      <div style="margin:16px 0 20px">
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.45);cursor:pointer"><input type="checkbox" style="width:14px;height:14px;accent-color:#9333ea"> تذكرني</label>
-        <a href="#" style="font-size:12px;color:#a78bfa;text-decoration:none;font-weight:600">مساعدة؟</a>
       </div>
       <button type="submit" style="width:100%;padding:14px;border:none;border-radius:14px;background:linear-gradient(135deg,#9333ea,#3b82f6,#ec4899);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background-size:200% 100%">
         <span class="material-symbols-outlined" style="font-size:18px">login</span> تسجيل الدخول
       </button>
     </form>
+    <div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,.06)">
+      @if (schoolPhone()) {
+        <a href="tel:{{ schoolPhone() }}"
+           style="display:inline-flex;align-items:center;gap:10px;padding:10px 24px;border-radius:16px;background:linear-gradient(135deg,rgba(147,51,234,0.12),rgba(59,130,246,0.06));border:1px solid rgba(147,51,234,0.2);color:#a78bfa;font-size:13px;font-weight:600;text-decoration:none;transition:all .3s ease;direction:ltr"
+           onmouseover="this.style.background='linear-gradient(135deg,rgba(147,51,234,0.2),rgba(59,130,246,0.12))';this.style.borderColor='rgba(147,51,234,0.35)';this.style.boxShadow='0 4px 20px rgba(147,51,234,0.12)'"
+           onmouseout="this.style.background='linear-gradient(135deg,rgba(147,51,234,0.12),rgba(59,130,246,0.06))';this.style.borderColor='rgba(147,51,234,0.2)';this.style.boxShadow='none'">
+          <span class="material-symbols-outlined" style="font-size:20px;font-variation-settings:'FILL'1">support_agent</span>
+          <span style="color:#e4d5ff">تواصل مع المدرسة</span>
+          <span style="font-size:11px;color:rgba(167,139,250,0.6);font-weight:400;direction:ltr">({{ schoolPhone() }})</span>
+        </a>
+      }
+    </div>
   </div>
 </body>

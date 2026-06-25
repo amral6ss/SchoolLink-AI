@@ -15,6 +15,7 @@ namespace Project.BLL.Interfaces
         Task<OperationResult<GetExamAttemptDto>> SubmitAttemptAsync(SubmitExamAttemptDto dto);
         Task<OperationResult> GradeEssayAnswersAsync(int attemptId, GradeEssayAttemptDto dto, int teacherId);
         Task<OperationResult<List<ExamAttemptSummaryDto>>> GetStudentAttemptsAsync(int enrollmentId, int examId);
+        Task<OperationResult<AiGradeResponseDto>> AiGradeSuggestionsAsync(int attemptId, int teacherId);
 
         /// <summary>Legacy — kept for backward compatibility; marked for removal.</summary>
         Task<OperationResult> AutoGradeAsync(int attemptId);

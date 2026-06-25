@@ -9,7 +9,7 @@ import {
   ExamManagerService,
   ExamItem, ExamDetail, ExamStats, ExamFilter,
   ExamDraftQuestion, CreateExamQuestionPayload,
-  ExamAttemptSummary, ExamAttemptGradingDetail
+  ExamAttemptSummary, ExamAttemptGradingDetail, AiGradeSuggestion
 } from './exam-manager.service';
 import { AcademicYearService } from '../../core/services/academic-year.service';
 import { GradeLevelService } from '../../core/services/grade-level.service';
@@ -61,6 +61,9 @@ export class ExamManagement implements OnInit, OnDestroy {
   resultsExam    = signal<ExamAttemptSummary[] | null>(null);
   resultsExamId  = signal<number | null>(null);
   gradingAttempt = signal<ExamAttemptGradingDetail | null>(null);
+  aiGradingLoading = signal(false);
+  aiGradeSuggestions = signal<AiGradeSuggestion[] | null>(null);
+  aiGradeError = signal('');
 
   // ── Form fields ───────────────────────────────────────────────
   formError  = signal('');
@@ -362,6 +365,9 @@ export class ExamManagement implements OnInit, OnDestroy {
     this.resultsExam.set(null);
     this.resultsExamId.set(null);
     this.gradingAttempt.set(null);
+    this.aiGradeSuggestions.set(null);
+    this.aiGradeError.set('');
+    this.aiGradingLoading.set(false);
     this.formError.set('');
     this.draftQuestions.set([]);
   }
@@ -580,11 +586,61 @@ export class ExamManagement implements OnInit, OnDestroy {
 
   openGradingModal(attemptId: number) {
     this.gradingAttempt.set(null);
+    this.aiGradeSuggestions.set(null);
+    this.aiGradeError.set('');
+    this.aiGradingLoading.set(false);
     this.showGradingModal.set(true);
 
     this.api.getAttemptDetail(attemptId).subscribe({
       next:  r => { if (r.isSuccess) this.gradingAttempt.set(r.data); },
       error: () => this.closeModals()
+    });
+  }
+
+  aiGradeAttempt() {
+    const attempt = this.gradingAttempt();
+    if (!attempt) return;
+
+    this.aiGradingLoading.set(true);
+    this.aiGradeError.set('');
+    this.aiGradeSuggestions.set(null);
+
+    this.api.aiGradeAttempt(attempt.id).subscribe({
+      next: r => {
+        this.aiGradingLoading.set(false);
+        if (r.isSuccess && r.data) {
+          this.aiGradeSuggestions.set(r.data.suggestions);
+          // تطبيق الاقتراحات تلقائياً على الدرجات
+          this.applyAiSuggestions(r.data.suggestions);
+        } else {
+          this.aiGradeError.set(r.message || 'فشل التصحيح بالذكاء الاصطناعي');
+        }
+      },
+      error: err => {
+        this.aiGradingLoading.set(false);
+        this.aiGradeError.set(err?.error?.message || 'خطأ في الاتصال بخدمة الذكاء الاصطناعي');
+      }
+    });
+  }
+
+  private applyAiSuggestions(suggestions: AiGradeSuggestion[]) {
+    this.gradingAttempt.update(a => {
+      if (!a) return a;
+      return {
+        ...a,
+        answers: a.answers.map(ans => {
+          const suggestion = suggestions.find(s => s.answerId === ans.id);
+          if (suggestion && (ans.questionType === 'essay' || ans.questionType === 'fill-blank')) {
+            return {
+              ...ans,
+              pointsEarned: suggestion.suggestedPoints,
+              _aiSuggested: suggestion.suggestedPoints,
+              _aiJustification: suggestion.justification
+            };
+          }
+          return ans;
+        })
+      };
     });
   }
 

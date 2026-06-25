@@ -295,7 +295,7 @@
             <span class="material-symbols-outlined" style="font-variation-settings:'FILL'1;font-size:40px;color:#a5b4fc">menu_book</span>
             <h3>المكتبة الذكية</h3>
             <p>أكثر من 5,000 مورد تعليمي مدعوم بالذكاء الاصطناعي</p>
-            <button class="sd-cta-btn" id="library-btn">تصفح الموارد</button>
+            <button class="sd-cta-btn" id="library-btn" (click)="navigateToLibrary()">تصفح الموارد</button>
           </div>
 
         </div>
@@ -311,7 +311,7 @@
 </div>
 
 <!-- Floating AI Button -->
-<button class="sd-fab" id="ai-fab-btn" title="المساعد الذكي">
+<button class="sd-fab" id="ai-fab-btn" title="المساعد الذكي" (click)="navigateToChatAi()">
   <span class="material-symbols-outlined" style="font-variation-settings:'FILL'1;font-size:28px">auto_awesome</span>
   <span class="sd-fab-tooltip">اسأل المساعد الذكي</span>
 </button>

@@ -65,11 +65,10 @@
           </div>
         </div>
 
-        <div class="flex items-center justify-between">
+        <div class="flex items-center">
           <label class="flex items-center gap-2 text-sm text-on-surface-variant cursor-pointer">
             <input type="checkbox" class="w-4 h-4 rounded border-outline/50 text-primary" /> تذكرني
           </label>
-          <a href="#" class="text-sm text-primary hover:text-primary/80 font-semibold no-underline">{{ roleTab() === 'student' ? 'مساعدة؟' : 'نسيت كلمة المرور؟' }}</a>
         </div>
 
         @if (errorMsg()) {
@@ -86,9 +85,16 @@
         </button>
       </form>
 
-      <p class="text-center text-sm text-on-surface-variant mt-8 pt-6 border-t border-outline/10">
-        ليس لديك حساب؟ <a href="#" class="text-primary font-bold hover:underline">تواصل مع المدرسة</a>
-      </p>
+      <div class="text-center mt-8 pt-6 border-t border-outline/10">
+        @if (schoolPhone()) {
+          <a href="tel:{{ schoolPhone() }}"
+             class="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-gradient-to-l from-primary/10 to-blue-500/5 border border-primary/20 text-primary font-semibold text-sm no-underline transition-all duration-300 hover:from-primary/20 hover:to-blue-500/10 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.97]">
+            <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL'1;">support_agent</span>
+            <span>تواصل مع المدرسة</span>
+            <span class="text-xs text-primary/60 font-normal transition-all duration-300 group-hover:text-primary/90" dir="ltr" style="direction:ltr">({{ schoolPhone() }})</span>
+          </a>
+        }
+      </div>
     </div>
   </div>
 </div>

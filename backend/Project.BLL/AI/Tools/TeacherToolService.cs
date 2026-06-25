@@ -511,7 +511,7 @@ public class TeacherToolService : ITeacherToolService
                     title = exam.Title,
                     totalScore = exam.TotalScore,
                     questionsCount = exam.QuestionsCount,
-                    viewUrl = $"/exam/{exam.Uid}/html",
+                    viewUrl = $"/api/exam/{exam.Uid}/html",
                     message = $"تم إنشاء الامتحان وحفظه بنجاح. يمكنك معاينته من الرابط أعلاه.{contentNote}"
                 }, new JsonSerializerOptions { WriteIndented = true });
             }
