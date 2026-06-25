@@ -277,7 +277,7 @@
                   </td>
                   <td class="text-center">
                     <div class="action-group">
-                      <button (click)="openDaysDialog(assignment)" class="action-btn action-green" title="إدارة أيام الحصص">
+                      <button (click)="goToSchedule(assignment)" class="action-btn action-green" title="عرض/تعديل في جدول الحصص">
                         <span class="material-symbols-outlined">calendar_month</span>
                       </button>
                       <button (click)="startEdit(assignment)" class="action-btn action-blue" title="تعديل">
@@ -389,64 +389,6 @@
     </div><!-- /page-inner -->
   </main>
 </div><!-- /page-wrapper -->
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     DAYS DIALOG
-════════════════════════════════════════════════════════════════════════ -->
-@if (daysDialogCst(); as dialogAssignment) {
-  <div class="dialog-overlay" (click)="cancelDaysDialog()">
-    <div class="dialog-box animate-dialog" (click)="$event.stopPropagation()">
-
-      <div class="dialog-head">
-        <div class="dialog-head-icon">
-          <span class="material-symbols-outlined">calendar_month</span>
-        </div>
-        <div>
-          <h3 class="dialog-title">أيام الحصص</h3>
-          <p class="dialog-sub">
-            <strong>{{ dialogAssignment.subjectName || getSubjectName(dialogAssignment.subjectId) }}</strong>
-            &nbsp;—&nbsp;
-            {{ dialogAssignment.teacherName || getTeacherName(dialogAssignment.teacherId) }}
-          </p>
-        </div>
-        <button class="dialog-close-btn" (click)="cancelDaysDialog()">
-          <span class="material-symbols-outlined">close</span>
-        </button>
-      </div>
-
-      <div class="dialog-body">
-        <p class="dialog-guide">اختر أيام تدريس هذه المادة في الأسبوع:</p>
-        <div class="day-list">
-          @for (day of dayOptions; track day) {
-            <label class="day-item" [class.day-item-checked]="dialogSelectedDays().includes(day)">
-              <input type="checkbox" [checked]="dialogSelectedDays().includes(day)" (change)="toggleDay(day)" class="day-checkbox" />
-              <span class="day-check-icon material-symbols-outlined">
-                {{ dialogSelectedDays().includes(day) ? 'check_box' : 'check_box_outline_blank' }}
-              </span>
-              <span class="day-label">{{ dayLabels[day] }}</span>
-              @if (dialogSelectedDays().includes(day)) {
-                <span class="day-active-dot"></span>
-              }
-            </label>
-          }
-        </div>
-      </div>
-
-      <div class="dialog-footer">
-        <button (click)="cancelDaysDialog()" [disabled]="daysSaving()" class="dialog-cancel-btn">إلغاء</button>
-        <button (click)="saveDays()" [disabled]="daysSaving()" class="dialog-save-btn">
-          @if (daysSaving()) {
-            <span class="material-symbols-outlined animate-spin-slow">sync</span>
-          } @else {
-            <span class="material-symbols-outlined">save</span>
-          }
-          حفظ
-        </button>
-      </div>
-
-    </div>
-  </div>
-}
 
 <!-- ══════════════════════════════════════════════════════════════════════
      DELETE CONFIRM

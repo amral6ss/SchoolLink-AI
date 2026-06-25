@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Sidebar } from '../../layouts/sidebar/sidebar';
 import { ClassSubjectTeacherService, ClassSubjectTeacher } from '../../core/services/class-subject-teacher.service';
 import { ClassService, ClassEntity } from '../../core/services/class.service';
@@ -481,166 +482,22 @@ export class TeacherAssignments implements OnInit {
     });
   }
 
-  /* ── Days management ─────────────────────────────────── */
+  /* ── Days display (read-only) ────────────────────────────────────────
+     الأيام هنا للعرض فقط — مصدرها الجدول الفعلي اللي بيتم بناؤه وإدارته
+     من صفحة admin-schedule (Timetable / TimetableSlot)، مربوطة بنفس
+     التعيين عبر classSubjectTeacherId.
+
+     قصدًا مفيش هنا أي تعديل/كتابة مباشرة على الجدول: تعديل الأيام بيستلزم
+     اختيار يوم + حصة + قاعة وتطبيق فحوصات التعارض والتوقيت الموحّد، وكل
+     ده موجود وكامل في admin-schedule فقط. تكرار جزء منه هنا بمنطق مبسّط
+     كان بيدّي بيانات غير مكتملة (بدون قاعة، بتوقيت وهمي 08:00-08:45، وبدون
+     فحص تعارض حقيقي) ويفتح مسارين كتابة مختلفين على نفس البيانات.
+     لإدارة الأيام فعليًا → زرار "عرض في الجدول" بيحوّل لـ admin-schedule. */
 
   private timetableService = inject(TimetableService);
+  private router = inject(Router);
 
-  daysDialogCst = signal<ClassSubjectTeacher | null>(null);
-  dialogSelectedDays = signal<string[]>([]);
-  daysSaving = signal(false);
   assignmentDaysMap = signal<Record<number, string[]>>({});
-
-  dayOptions = ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
-
-  get dayLabels(): Record<string, string> { return DAY_LABELS; }
-
-  async openDaysDialog(assignment: ClassSubjectTeacher) {
-    this.daysDialogCst.set(assignment);
-    this.dialogSelectedDays.set([]);
-
-    if (!this.currentAcademicYearId) return;
-
-    try {
-      const listRes: any = await this.timetableService.getByClass(assignment.classId, this.currentAcademicYearId).toPromise();
-      const allTts: any[] = listRes?.data ?? listRes ?? [];
-      // Prefer draft over active to show the latest editable state
-      const tt = Array.isArray(allTts) ? (allTts.find((t: any) => !t.isActive) || allTts.find((t: any) => t.isActive)) : null;
-      const slots: TimetableSlotDto[] = tt?.slots ?? [];
-      const assignmentSlots = slots.filter(s => s.classSubjectTeacherId === assignment.id && !s.isBreak);
-      this.dialogSelectedDays.set([...new Set(assignmentSlots.map(s => s.dayOfWeek))]);
-    } catch { /* no timetable */ }
-  }
-
-  toggleDay(day: string) {
-    const current = this.dialogSelectedDays();
-    if (current.includes(day)) {
-      this.dialogSelectedDays.set(current.filter(d => d !== day));
-    } else {
-      this.dialogSelectedDays.set([...current, day]);
-    }
-  }
-
-  async saveDays() {
-    const assignment = this.daysDialogCst();
-    if (!assignment?.id || !this.currentAcademicYearId) return;
-
-    this.daysSaving.set(true);
-
-    try {
-      let timetableId: number | null = null;
-      let existingSlots: TimetableSlotDto[] = [];
-
-      // 1. Get all timetables for this class
-      const listRes: any = await this.timetableService.getByClass(assignment.classId, this.currentAcademicYearId).toPromise();
-      const allTts: any[] = listRes?.data ?? listRes ?? [];
-
-      // 2. Find active and draft timetables
-      const active = Array.isArray(allTts) ? allTts.find((t: any) => t.isActive) : null;
-      const draft = Array.isArray(allTts) ? allTts.find((t: any) => !t.isActive) : null;
-
-      // 3. If draft exists, use it
-      if (draft?.id) {
-        timetableId = draft.id;
-        existingSlots = (draft.slots ?? []).filter((s: TimetableSlotDto) => s.classSubjectTeacherId === assignment.id && !s.isBreak);
-      }
-      // 4. If only active exists, clone it to create a draft
-      else if (active?.id) {
-        try {
-          const cloned: any = await this.timetableService.cloneDraft(assignment.classId, this.currentAcademicYearId).toPromise();
-          const clonedData = cloned?.data ?? cloned;
-          timetableId = clonedData?.id ?? cloned?.id;
-          existingSlots = (clonedData?.slots ?? []).filter((s: TimetableSlotDto) => s.classSubjectTeacherId === assignment.id && !s.isBreak);
-        } catch {
-          // clone failed (e.g. draft already exists), try getting the draft again
-          const retryRes: any = await this.timetableService.getByClass(assignment.classId, this.currentAcademicYearId).toPromise();
-          const retryTts: any[] = retryRes?.data ?? retryRes ?? [];
-          const retryDraft = Array.isArray(retryTts) ? retryTts.find((t: any) => !t.isActive) : null;
-          if (retryDraft?.id) {
-            timetableId = retryDraft.id;
-            existingSlots = (retryDraft.slots ?? []).filter((s: TimetableSlotDto) => s.classSubjectTeacherId === assignment.id && !s.isBreak);
-          } else {
-            timetableId = active.id; // last resort — may fail on addSlot
-          }
-        }
-      }
-      // 5. No timetable at all — create a new draft
-      else {
-        const created: any = await this.timetableService.create({
-          classId: assignment.classId,
-          academicYearId: this.currentAcademicYearId,
-        }).toPromise();
-        timetableId = created?.data?.id ?? created?.id;
-        existingSlots = [];
-      }
-
-      if (!timetableId) { this.showError('تعذر العثور على جدول للفصل'); this.daysSaving.set(false); return; }
-
-      const selectedDays = this.dialogSelectedDays();
-
-      // Delete unwanted slots
-      for (const slot of existingSlots) {
-        if (!selectedDays.includes(slot.dayOfWeek)) {
-          try {
-            await this.timetableService.deleteSlot(slot.id).toPromise();
-          } catch (delErr: any) {
-            console.warn('deleteSlot failed (ignored):', slot.id, delErr?.error?.message || delErr?.message);
-          }
-        }
-      }
-
-      // Verify the timetable is a draft (not active) before modifying
-      const refreshed: any = await this.timetableService.getById(timetableId!).toPromise();
-      const draftDetail = refreshed?.data ?? refreshed;
-      if (draftDetail?.isActive) {
-        this.showError('لا يمكن تعديل جدول منشور مباشرة. أنشئ مسودة جديدة أولاً.');
-        this.daysSaving.set(false);
-        return;
-      }
-      const allCurrentSlots: TimetableSlotDto[] = draftDetail?.slots ?? [];
-
-      // Add new slots using next available period number on each day
-      for (const day of selectedDays) {
-        if (!existingSlots.some(s => s.dayOfWeek === day)) {
-          const daySlots = allCurrentSlots.filter(s => s.dayOfWeek === day && !s.isBreak);
-          const usedPeriods = daySlots.map(s => s.periodNumber);
-          let period = 1;
-          while (usedPeriods.includes(period)) { period++; }
-
-          try {
-            await this.timetableService.addSlot({
-              timetableId,
-              dayOfWeek: day,
-              periodNumber: period,
-              startTime: '08:00:00',
-              endTime: '08:45:00',
-              classSubjectTeacherId: assignment.id,
-              isBreak: false,
-            }).toPromise();
-          } catch (addErr: any) {
-            const addMsg = addErr?.error?.message || addErr?.error?.title || addErr?.message || 'Unknown';
-            console.error(`addSlot failed [day=${day}, period=${period}, timetableId=${timetableId}]:`, addMsg);
-            this.showError(`تعذر إضافة الحصة ليوم ${day} (الفترة ${period}): ${addMsg}`);
-            throw addErr;
-          }
-        }
-      }
-
-      this.assignmentDaysMap.update(m => { m[assignment.id!] = selectedDays; return m; });
-
-      this.daysDialogCst.set(null);
-      this.showSuccess('تم حفظ أيام الحصص بنجاح');
-    } catch (e: any) {
-      console.error('saveDays outer catch:', e);
-      const msg = e?.error?.message || e?.error?.title || e?.message || '';
-      this.showError('تعذر حفظ أيام الحصص: ' + msg);
-    } finally {
-      this.daysSaving.set(false);
-    }
-  }
-
-  cancelDaysDialog() {
-    this.daysDialogCst.set(null);
-  }
 
   getAssignmentDays(assignmentId: number): string {
     const days = this.assignmentDaysMap()[assignmentId];
@@ -664,6 +521,18 @@ export class TeacherAssignments implements OnInit {
       const days = [...new Set(assignmentSlots.map(s => s.dayOfWeek))];
       this.assignmentDaysMap.update(m => { m[assignment.id!] = days; return m; });
     } catch { /* ignore */ }
+  }
+
+  /** تحويل الأدمن لصفحة admin-schedule على نفس الفصل/السنة لإدارة الجدول فعليًا */
+  goToSchedule(assignment: ClassSubjectTeacher): void {
+    const classEntity = this.classes().find(c => c.id === assignment.classId);
+    this.router.navigate(['/admin-schedule'], {
+      queryParams: {
+        classId: assignment.classId,
+        yearId: this.currentAcademicYearId,
+        gradeId: classEntity?.gradeLevelId ?? null,
+      },
+    });
   }
 
   private showError(msg: string) {

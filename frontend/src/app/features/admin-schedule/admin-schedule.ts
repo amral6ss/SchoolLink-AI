@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Sidebar } from '../../layouts/sidebar/sidebar';
 import { FocusTrap } from '../../core/directives/focus-trap';
@@ -238,12 +239,19 @@ export class AdminSchedule implements OnInit, OnDestroy {
   private userService = inject(UserService);
   private gradeLevelService = inject(GradeLevelService);
   private destroyRef = inject(DestroyRef);
+  private route = inject(ActivatedRoute);
+
+  /** فلتر مبدئي جاي من query params (مثلاً من زرار "عرض في الجدول" في صفحة التعيينات) */
+  private pendingPreselect: { classId: number | null; yearId: number | null; gradeId: number | null } | null = null;
+  /** عدد طلبات التحميل الأولية اللي لسه ما خلصتش (subjects/teachers/grades/classes/years) */
+  private initialLoadsPending = 5;
 
   // ══════════════════════════════════════════════════════════════════════════
   // Lifecycle
   // ══════════════════════════════════════════════════════════════════════════
 
   ngOnInit(): void {
+    this.readPreselectFromRoute();
     this.loadInitialData();
 
     // إغلاق بنك الحصص تلقائيًا على الشاشات الصغيرة لتفادي التداخل
@@ -253,6 +261,51 @@ export class AdminSchedule implements OnInit, OnDestroy {
       }
     };
     window.addEventListener('resize', this.resizeHandler);
+  }
+
+  /** قراءة classId/yearId/gradeId من query params لو موجودة (deep link من صفحات تانية) */
+  private readPreselectFromRoute(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const classId = Number(params.get('classId'));
+    const yearId = Number(params.get('yearId'));
+    const gradeId = Number(params.get('gradeId'));
+    if (classId || yearId || gradeId) {
+      this.pendingPreselect = {
+        classId: classId || null,
+        yearId: yearId || null,
+        gradeId: gradeId || null,
+      };
+    }
+  }
+
+  /** يتنادى من كل استدعاء تحميل أولي (next أو error) في loadInitialData() */
+  private markInitialLoadDone(): void {
+    this.initialLoadsPending = Math.max(0, this.initialLoadsPending - 1);
+    if (this.initialLoadsPending === 0) {
+      this.applyPendingPreselect();
+    }
+  }
+
+  /**
+   * بعد اكتمال تحميل البيانات المرجعية الأولية بالكامل (السنوات/الصفوف/الفصول)، نطبّق الفلتر
+   * المبدئي الجاي من query params لو موجود وصالح (موجود بالفعل في البيانات المحمّلة).
+   * بيعلو السنة الحالية المتعيّنة تلقائيًا لو فيها تعارض.
+   */
+  private applyPendingPreselect(): void {
+    const p = this.pendingPreselect;
+    this.pendingPreselect = null;
+    if (!p) return;
+
+    if (p.yearId && this.academicYears().some(y => y.id === p.yearId)) {
+      this.selectedYearId.set(p.yearId);
+    }
+    if (p.gradeId && this.grades().some(g => g.id === p.gradeId)) {
+      this.selectedGradeId.set(p.gradeId);
+    }
+    if (p.classId && this.classes().some(c => c.id === p.classId)) {
+      this.selectedClassId.set(p.classId);
+    }
+    this.onFilterChange();
   }
 
   ngOnDestroy(): void {
@@ -571,16 +624,16 @@ export class AdminSchedule implements OnInit, OnDestroy {
     this.subjectService.getAll()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (data: any) => this.subjects.set(this.unwrap(data)),
-        error: () => this.showError('تعذر تحميل بيانات المواد'),
+        next: (data: any) => { this.subjects.set(this.unwrap(data)); this.markInitialLoadDone(); },
+        error: () => { this.showError('تعذر تحميل بيانات المواد'); this.markInitialLoadDone(); },
       });
 
     // pageSize مرتفعة لاستيعاب كل المعلمين دفعة واحدة (مع إمكانية التوسعة لاحقًا)
     this.userService.getByRole('Teacher', 5000)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (res: any) => this.teachers.set(res?.data?.items ?? res?.items ?? []),
-        error: () => this.showError('تعذر تحميل بيانات المعلمين'),
+        next: (res: any) => { this.teachers.set(res?.data?.items ?? res?.items ?? []); this.markInitialLoadDone(); },
+        error: () => { this.showError('تعذر تحميل بيانات المعلمين'); this.markInitialLoadDone(); },
       });
 
     this.gradeLevelService.getAll()
@@ -590,15 +643,16 @@ export class AdminSchedule implements OnInit, OnDestroy {
           const unwrapped = this.unwrap(data);
           const sortedGrades = [...unwrapped].sort((a, b) => a.levelOrder - b.levelOrder);
           this.grades.set(sortedGrades);
+          this.markInitialLoadDone();
         },
-        error: () => this.showError('تعذر تحميل بيانات الصفوف الدراسية'),
+        error: () => { this.showError('تعذر تحميل بيانات الصفوف الدراسية'); this.markInitialLoadDone(); },
       });
 
     this.classService.getAll()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (data: any) => this.classes.set(this.unwrap(data)),
-        error: () => this.showError('تعذر تحميل بيانات الفصول'),
+        next: (data: any) => { this.classes.set(this.unwrap(data)); this.markInitialLoadDone(); },
+        error: () => { this.showError('تعذر تحميل بيانات الفصول'); this.markInitialLoadDone(); },
       });
 
     this.academicYearService.getAll()
@@ -609,8 +663,9 @@ export class AdminSchedule implements OnInit, OnDestroy {
           this.academicYears.set(unwrapped);
           const active = unwrapped.find(y => y.isCurrent);
           if (active) this.selectedYearId.set(active.id);
+          this.markInitialLoadDone();
         },
-        error: () => this.showError('تعذر تحميل السنوات الدراسية'),
+        error: () => { this.showError('تعذر تحميل السنوات الدراسية'); this.markInitialLoadDone(); },
       });
   }
 
