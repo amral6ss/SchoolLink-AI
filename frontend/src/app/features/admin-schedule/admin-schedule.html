@@ -170,7 +170,7 @@
               </button>
 
               <button (click)="publishCurrentTimetable()"
-                      [disabled]="!currentTimetable() || currentTimetable()!.isActive || isPublishing() || hasBlockingValidationErrors()"
+                      [disabled]="!canEditCurrentTimetable() || isPublishing() || hasBlockingValidationErrors()"
                       class="sched-btn sched-btn-success">
                 <span class="btn-shimmer"></span>
                 <span class="material-symbols-outlined">{{ isPublishing() ? 'progress_activity' : 'publish' }}</span>
@@ -226,10 +226,10 @@
           <!-- ─── حالة الجدول الحالي ──────────────────────────────── -->
           @if (currentTimetable(); as t) {
             <div class="status-banner anim-card" style="--card-delay:0.1s"
-                 [ngClass]="t.isActive ? 'is-active' : 'is-draft'">
+                 [ngClass]="isActiveTimetable(t) ? 'is-active' : (isArchivedTimetable(t) ? 'is-archived' : 'is-draft')">
               <div class="flex items-start gap-3">
                 <span class="material-symbols-outlined mt-0.5" aria-hidden="true">
-                  {{ t.isActive ? 'lock' : 'edit_calendar' }}
+                  {{ isActiveTimetable(t) ? 'lock' : (isArchivedTimetable(t) ? 'inventory_2' : 'edit_calendar') }}
                 </span>
                 <div>
                   <div class="font-bold mb-1">حالة الجدول: {{ getCurrentStatusLabel() }}</div>
@@ -563,7 +563,7 @@
         </button>
 
         <button (click)="publishCurrentTimetable()"
-                [disabled]="!currentTimetable() || currentTimetable()!.isActive || isPublishing() || hasBlockingValidationErrors()"
+                [disabled]="!canEditCurrentTimetable() || isPublishing() || hasBlockingValidationErrors()"
                 class="sched-btn sched-btn-success">
           <span class="btn-shimmer"></span>
           <span class="material-symbols-outlined">{{ isPublishing() ? 'progress_activity' : 'publish' }}</span>
@@ -663,6 +663,10 @@
                 class="filter-pill" [class.is-active]="isTimetablesFilterActive('draft')">
           مسودات <span class="opacity-80">{{ getDraftTimetablesCount() }}</span>
         </button>
+        <button type="button" (click)="setTimetablesFilter('archived')"
+                class="filter-pill" [class.is-active]="isTimetablesFilterActive('archived')">
+          مؤرشف <span class="opacity-80">{{ getArchivedTimetablesCount() }}</span>
+        </button>
       </div>
 
       <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3 bg-background">
@@ -673,15 +677,15 @@
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2 mb-2">
-                  <span class="status-tag" [ngClass]="timetable.isActive ? 'tag-active' : 'tag-draft'">
-                    {{ timetable.isActive ? 'منشور' : 'مسودة' }}
+                  <span class="status-tag" [ngClass]="isActiveTimetable(timetable) ? 'tag-active' : (isArchivedTimetable(timetable) ? 'tag-archived' : 'tag-draft')">
+                    {{ isActiveTimetable(timetable) ? 'منشور' : (isArchivedTimetable(timetable) ? 'مؤرشف' : 'مسودة') }}
                   </span>
                   @if (isSelectedTimetable(timetable.id)) {
                     <span class="status-tag tag-current">المعروض الآن</span>
                   }
                 </div>
                 <div class="font-bold text-on-surface mb-1">
-                  {{ timetable.isActive ? 'نسخة منشورة جاهزة للعرض' : 'نسخة مسودة قابلة للتعديل' }}
+                  {{ isActiveTimetable(timetable) ? 'نسخة منشورة جاهزة للعرض' : (isArchivedTimetable(timetable) ? 'نسخة مؤرشفة للقراءة فقط' : 'نسخة مسودة قابلة للتعديل') }}
                 </div>
                 <div class="text-sm text-on-surface-variant mb-1">أُنشئت {{ formatTimetableDate(timetable.createdAt) }}</div>
                 <div class="text-sm text-on-surface-variant">آخر تحديث {{ formatTimetableDate(timetable.updatedAt) }}</div>
@@ -872,7 +876,7 @@
 
           <div>
             <label class="modal-field-label" for="slot-room">
-              الفصول المتاحة في هذا الوقت
+              القاعة
               @if (roomsLoading()) { <span class="text-xs text-on-surface-variant">(جارٍ التحميل…)</span> }
             </label>
             <select id="slot-room"

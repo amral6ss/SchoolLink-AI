@@ -644,6 +644,12 @@
   color: #1e3a8a;
 }
 
+.status-banner.is-archived {
+  background: rgba(241, 245, 249, 0.95);
+  border-color: rgba(100, 116, 139, 0.24);
+  color: #475569;
+}
+
 .status-banner-chip {
   padding: 4px 12px;
   border-radius: 999px;
@@ -1256,6 +1262,7 @@
 }
 .tag-active  { background: rgba(5, 150, 105, 0.12); color: var(--success); }
 .tag-draft   { background: rgba(0, 35, 111, 0.1); color: var(--primary); }
+.tag-archived { background: rgba(100, 116, 139, 0.14); color: #475569; }
 .tag-current { background: rgba(222, 247, 233, 0.95); color: #166534; }
 
 .chip-soft {

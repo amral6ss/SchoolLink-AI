@@ -15,6 +15,12 @@ export interface TimetableListItem {
   className?:     string;
   academicYearId: number | string;
   isActive?:      boolean;
+  status?:        string;
+  statusValue?:   number;
+  versionNumber?: number;
+  publishedAt?:   string | null;
+  archivedAt?:    string | null;
+  sourceTimetableId?: number | null;
   createdAt?:     string;
   updatedAt?:     string;
   slots?:         TimetableSlotDto[];

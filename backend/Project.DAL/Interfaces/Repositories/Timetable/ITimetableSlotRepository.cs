@@ -13,6 +13,7 @@ public sealed class RoomConflictInfo
     public string? SubjectName   { get; set; }
     public string? TeacherName   { get; set; }
     public bool   IsOtherDraft   { get; set; }
+    public TimetableStatus Status { get; set; }
 }
 
 public interface ITimetableSlotRepository : IRepository<TimetableSlot>
@@ -44,6 +45,8 @@ public interface ITimetableSlotRepository : IRepository<TimetableSlot>
         SchoolDay day,
         int periodNumber,
         int excludeTimetableId,
+        int excludeClassId,
+        int excludeAcademicYearId,
         int? excludeSlotId,
         CancellationToken ct = default);
 
@@ -66,6 +69,8 @@ public interface ITimetableSlotRepository : IRepository<TimetableSlot>
         SchoolDay day,
         int periodNumber,
         int excludeTimetableId,
+        int excludeClassId,
+        int excludeAcademicYearId,
         int? excludeSlotId,
         CancellationToken ct = default);
 
@@ -76,6 +81,8 @@ public interface ITimetableSlotRepository : IRepository<TimetableSlot>
     Task<IReadOnlyList<(int RoomId, SchoolDay DayOfWeek, int PeriodNumber)>> GetRoomConflictsAgainstActiveAsync(
         IEnumerable<(int RoomId, SchoolDay DayOfWeek, int PeriodNumber)> candidates,
         int excludeTimetableId,
+        int excludeClassId,
+        int excludeAcademicYearId,
         CancellationToken ct = default);
 
     /// <summary>
@@ -85,6 +92,8 @@ public interface ITimetableSlotRepository : IRepository<TimetableSlot>
     Task<IReadOnlyList<(int TeacherId, SchoolDay DayOfWeek, int PeriodNumber)>> GetTeacherConflictsAgainstActiveAsync(
         IEnumerable<(int TeacherId, SchoolDay DayOfWeek, int PeriodNumber)> candidates,
         int excludeTimetableId,
+        int excludeClassId,
+        int excludeAcademicYearId,
         CancellationToken ct = default);
 
     Task BulkReplaceAsync(int timetableId, IEnumerable<TimetableSlot> slots, CancellationToken ct = default);

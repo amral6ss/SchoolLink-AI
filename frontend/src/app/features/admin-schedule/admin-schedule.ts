@@ -44,7 +44,8 @@ interface SlotDraft {
 
 interface DayDef { value: string; label: string; }
 interface PeriodDef { num: number; label: string; start: string; end: string; }
-type TimetablesFilter = 'all' | 'active' | 'draft';
+type TimetableStatusName = 'Draft' | 'Active' | 'Archived';
+type TimetablesFilter = 'all' | 'active' | 'draft' | 'archived';
 
 @Component({
   selector: 'app-admin-schedule',
@@ -823,12 +824,12 @@ export class AdminSchedule implements OnInit, OnDestroy {
 
   canDeleteTimetable(): boolean {
     const t = this.currentTimetable();
-    return !!t && !t.isActive;
+    return !!t && this.isDraftTimetable(t);
   }
 
   deleteTimetable(): void {
     const timetable = this.currentTimetable();
-    if (!timetable || timetable.isActive) return;
+    if (!timetable || !this.isDraftTimetable(timetable)) return;
 
     this.deleteTimetableConfirmOpen.set(false);
     this.isDeletingTimetable.set(true);
@@ -855,12 +856,12 @@ export class AdminSchedule implements OnInit, OnDestroy {
 
   canDeactivateTimetable(): boolean {
     const t = this.currentTimetable();
-    return !!t && t.isActive;
+    return !!t && this.isActiveTimetable(t);
   }
 
   deactivateTimetable(): void {
     const timetable = this.currentTimetable();
-    if (!timetable || !timetable.isActive) return;
+    if (!timetable || !this.isActiveTimetable(timetable)) return;
 
     this.deactivateConfirmOpen.set(false);
     this.isDeactivating.set(true);
@@ -872,7 +873,7 @@ export class AdminSchedule implements OnInit, OnDestroy {
           this.isDeactivating.set(false);
           this.loadTimetables();
           this.validationResult.set(null);
-          this.showSuccess('تم إلغاء تفعيل الجدول وأصبح مسودة قابلة للتعديل.');
+          this.showSuccess('تم إلغاء نشر الجدول ونقله إلى الأرشيف.');
         },
         error: (err: any) => {
           this.isDeactivating.set(false);
@@ -893,7 +894,7 @@ export class AdminSchedule implements OnInit, OnDestroy {
    */
   publishCurrentTimetable(): void {
     const timetable = this.currentTimetable();
-    if (!timetable || timetable.isActive) return;
+    if (!timetable || !this.isDraftTimetable(timetable)) return;
 
     const validation = this.validationResult();
     if (!validation) {
@@ -914,7 +915,7 @@ export class AdminSchedule implements OnInit, OnDestroy {
           this.isPublishing.set(false);
           this.loadTimetables();
           this.validationResult.set(null);
-          this.showSuccess('تم تفعيل الجدول بنجاح وأصبح هو الجدول المنشور.');
+          this.showSuccess('تم نشر الجدول بنجاح وأصبح هو الجدول المعروض للطلاب والمعلمين.');
         },
         error: (err: any) => {
           this.isPublishing.set(false);
@@ -945,9 +946,11 @@ export class AdminSchedule implements OnInit, OnDestroy {
             this.showSuccess(res.canActivate
               ? 'اكتملت المراجعة: الجدول جاهز للتفعيل.'
               : 'اكتملت المراجعة: توجد عناصر تحتاج معالجة قبل التفعيل.');
-          } else if (!res.canActivate) {
+          } else if (res.canActivate) {
             // أثناء الـ publish flow: نواصل للنشر تلقائيًا إذا كان صالحًا
             this.publishCurrentTimetable();
+          } else {
+            this.showError('لا يمكن نشر الجدول قبل إصلاح التعارضات الظاهرة في نتيجة المراجعة.');
           }
         },
         error: (err: any) => {
@@ -1088,7 +1091,7 @@ export class AdminSchedule implements OnInit, OnDestroy {
       })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: () => this.finishSlotMutation('تم تحديث الحصة بنجاح'),
+          next: (res: any) => this.finishSlotMutation(this.getApiSuccessMessage(res, 'تم تحديث الحصة بنجاح')),
           error: (err: any) => {
             this.isSaving.set(false);
             const msg = this.getApiErrorMessage(err, 'تعذر تحديث الحصة الحالية.');
@@ -1111,7 +1114,7 @@ export class AdminSchedule implements OnInit, OnDestroy {
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.finishSlotMutation('تم تسكين الحصة بنجاح'),
+        next: (res: any) => this.finishSlotMutation(this.getApiSuccessMessage(res, 'تم تسكين الحصة بنجاح')),
         error: (err: any) => {
           this.isSaving.set(false);
           const msg = this.getApiErrorMessage(err, 'تعذر إضافة الحصة. تأكد من عدم وجود تعارض للمعلم أو الفصل.');
@@ -1292,12 +1295,12 @@ export class AdminSchedule implements OnInit, OnDestroy {
   // State predicates
   // ══════════════════════════════════════════════════════════════════════════
 
-  hasDraftTimetable(): boolean { return this.allTimetables().some(t => !t.isActive); }
-  hasPublishedTimetable(): boolean { return this.allTimetables().some(t => t.isActive); }
+  hasDraftTimetable(): boolean { return this.allTimetables().some(t => this.isDraftTimetable(t)); }
+  hasPublishedTimetable(): boolean { return this.allTimetables().some(t => this.isActiveTimetable(t)); }
   hasMultipleTimetables(): boolean { return this.allTimetables().length > 1; }
   canEditCurrentTimetable(): boolean {
     const t = this.currentTimetable();
-    return !!t && !t.isActive;
+    return !!t && this.isDraftTimetable(t);
   }
   canCreateDraft(): boolean {
     return !!this.selectedClassId() && !!this.selectedYearId() && !this.hasDraftTimetable();
@@ -1306,7 +1309,7 @@ export class AdminSchedule implements OnInit, OnDestroy {
     return !!this.selectedClassId()
       && !!this.selectedYearId()
       && !this.hasDraftTimetable()
-      && this.allTimetables().length > 0;
+      && this.allTimetables().some(t => this.isActiveTimetable(t) || this.isArchivedTimetable(t));
   }
   /** مصدر الحقيقة الوحيد لمنع النشر: canActivate من نتيجة المراجعة */
   hasBlockingValidationErrors(): boolean {
@@ -1315,7 +1318,26 @@ export class AdminSchedule implements OnInit, OnDestroy {
   }
   hasPendingValidation(): boolean {
     const t = this.currentTimetable();
-    return !!t && !t.isActive && !this.validationResult();
+    return !!t && this.isDraftTimetable(t) && !this.validationResult();
+  }
+
+  private getTimetableStatus(t: Timetable | TimetableListItem): TimetableStatusName {
+    const status = (t.status ?? '').toString().toLowerCase();
+    if (status === 'active' || t.statusValue === 1 || t.isActive === true) return 'Active';
+    if (status === 'archived' || t.statusValue === 2) return 'Archived';
+    return 'Draft';
+  }
+
+  isDraftTimetable(t: Timetable | TimetableListItem): boolean {
+    return this.getTimetableStatus(t) === 'Draft';
+  }
+
+  isActiveTimetable(t: Timetable | TimetableListItem): boolean {
+    return this.getTimetableStatus(t) === 'Active';
+  }
+
+  isArchivedTimetable(t: Timetable | TimetableListItem): boolean {
+    return this.getTimetableStatus(t) === 'Archived';
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1323,7 +1345,10 @@ export class AdminSchedule implements OnInit, OnDestroy {
   // ═══════════════════════════════════════════════════════════════​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​
   getCurrentStatusLabel(): string {
     const t = this.currentTimetable();
-    return t ? (t.isActive ? 'منشور' : 'مسودة') : '';
+    if (!t) return '';
+    if (this.isActiveTimetable(t)) return 'منشور';
+    if (this.isArchivedTimetable(t)) return 'مؤرشف';
+    return 'مسودة';
   }
 
   getTimetableCountLabel(): string {
@@ -1338,8 +1363,9 @@ export class AdminSchedule implements OnInit, OnDestroy {
 
   getCurrentTimetableVersionLabel(): string {
     const currentId = this.currentTimetable()?.id;
-    const index = this.allTimetables().findIndex(t => t.id === currentId);
-    return index >= 0 ? `النسخة ${index + 1}` : 'لم يتم اختيار نسخة';
+    const current = this.allTimetables().find(t => t.id === currentId);
+    if (!current) return 'لم يتم اختيار نسخة';
+    return current.versionNumber ? `النسخة ${current.versionNumber}` : `النسخة ${this.allTimetables().findIndex(t => t.id === currentId) + 1}`;
   }
 
   isSelectedTimetable(timetableId: number): boolean {
@@ -1351,18 +1377,23 @@ export class AdminSchedule implements OnInit, OnDestroy {
   }
 
   getPublishedTimetablesCount(): number {
-    return this.allTimetables().filter(t => t.isActive).length;
+    return this.allTimetables().filter(t => this.isActiveTimetable(t)).length;
   }
 
   getDraftTimetablesCount(): number {
-    return this.allTimetables().filter(t => !t.isActive).length;
+    return this.allTimetables().filter(t => this.isDraftTimetable(t)).length;
+  }
+
+  getArchivedTimetablesCount(): number {
+    return this.allTimetables().filter(t => this.isArchivedTimetable(t)).length;
   }
 
   readonly filteredTimetables = computed(() => {
     const filter = this.timetablesFilter();
     const list = this.allTimetables();
-    if (filter === 'active') return list.filter(t => t.isActive);
-    if (filter === 'draft') return list.filter(t => !t.isActive);
+    if (filter === 'active') return list.filter(t => this.isActiveTimetable(t));
+    if (filter === 'draft') return list.filter(t => this.isDraftTimetable(t));
+    if (filter === 'archived') return list.filter(t => this.isArchivedTimetable(t));
     return list;
   });
 
@@ -1384,9 +1415,13 @@ export class AdminSchedule implements OnInit, OnDestroy {
   getCurrentStatusMessage(): string {
     const t = this.currentTimetable();
     if (!t) return '';
-    return t.isActive
-      ? 'هذه هي النسخة المنشورة حاليًا. يمكنك فتح نسخة أخرى من قائمة الجداول أو إلغاء التفعيل إذا أردت تحويلها لمسودة.'
-      : 'أنت تعمل الآن على مسودة مستقلة. يمكنك تعديلها بأمان ثم تفعيلها عند الانتهاء.';
+    if (this.isActiveTimetable(t)) {
+      return 'هذه هي النسخة المنشورة حاليًا. أنشئ مسودة جديدة إذا أردت تعديل الجدول بدون التأثير على الطلاب والمعلمين.';
+    }
+    if (this.isArchivedTimetable(t)) {
+      return 'هذه نسخة مؤرشفة للقراءة فقط. لإنشاء تعديل جديد استخدم نسخ من الحالي وسيتم إنشاء مسودة قابلة للمراجعة والنشر.';
+    }
+    return 'أنت تعمل الآن على مسودة مستقلة. يمكنك تعديلها بأمان ثم نشرها بعد المراجعة.';
   }
 
   getValidationHeadline(): string {
@@ -1584,16 +1619,26 @@ export class AdminSchedule implements OnInit, OnDestroy {
 
   private pickWorkingTimetable(timetables: Timetable[]): Timetable | null {
     if (!timetables.length) return null;
-    return timetables.find(t => !t.isActive) || timetables.find(t => t.isActive) || null;
+    return timetables.find(t => this.isDraftTimetable(t))
+      || timetables.find(t => this.isActiveTimetable(t))
+      || timetables.find(t => this.isArchivedTimetable(t))
+      || null;
   }
 
   private normalizeTimetable(item: Timetable | TimetableListItem): Timetable {
+    const status = this.getTimetableStatus(item);
     return {
       id: item.id,
       classId: Number(item.classId),
       className: item.className ?? '',
       academicYearId: Number(item.academicYearId),
-      isActive: !!item.isActive,
+      isActive: status === 'Active',
+      status,
+      statusValue: item.statusValue ?? (status === 'Active' ? 1 : status === 'Archived' ? 2 : 0),
+      versionNumber: item.versionNumber ?? 1,
+      publishedAt: item.publishedAt ?? null,
+      archivedAt: item.archivedAt ?? null,
+      sourceTimetableId: item.sourceTimetableId ?? null,
       createdAt: item.createdAt ?? '',
       updatedAt: item.updatedAt ?? item.createdAt ?? '',
       slots: item.slots ?? [],
@@ -1614,7 +1659,7 @@ export class AdminSchedule implements OnInit, OnDestroy {
 
   private loadAvailableRooms(dayValue: string, periodNum: number): void {
     this.roomsLoading.set(true);
-    this.roomService.getAvailable(dayValue, periodNum)
+    this.roomService.getAll()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (data: any) => {
@@ -1764,6 +1809,11 @@ export class AdminSchedule implements OnInit, OnDestroy {
     if (typeof problem?.title === 'string' && problem.title.trim()) return problem.title;
 
     return fallback;
+  }
+
+  private getApiSuccessMessage(res: any, fallback: string): string {
+    const message = res?.message ?? res?.data?.message;
+    return typeof message === 'string' && message.trim() ? message : fallback;
   }
 
   private showError(msg: string): void {

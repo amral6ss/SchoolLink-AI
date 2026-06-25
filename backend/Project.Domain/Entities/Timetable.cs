@@ -1,16 +1,20 @@
-﻿namespace Project.Domain.Entities
+using Project.Domain.Enums;
+
+namespace Project.Domain.Entities
 {
     public class Timetable : BaseEntity
     {
         public int ClassId { get; set; }
         public int AcademicYearId { get; set; }
-        // الجداول تُنشأ دائمًا كمسودة (غير منشورة). التفعيل يتم فقط عبر ActivateTimetableAsync
-        // بعد اجتياز المراجعة. الافتراضي القديم `true` كان يسمح بنشر جدول فارغ عن طريق الخطأ.
-        public bool IsActive { get; set; } = false;
+        public TimetableStatus Status { get; set; } = TimetableStatus.Draft;
+        public int VersionNumber { get; set; } = 1;
+        public DateTime? PublishedAt { get; set; }
+        public DateTime? ArchivedAt { get; set; }
+        public int? SourceTimetableId { get; set; }
 
-        // Navigation Properties
         public SchoolClass Class { get; set; } = null!;
         public AcademicYear AcademicYear { get; set; } = null!;
+        public Timetable? SourceTimetable { get; set; }
         public ICollection<TimetableSlot> Slots { get; set; } = new List<TimetableSlot>();
     }
 }

@@ -332,7 +332,11 @@ public static class SeedData
             var tt = new Timetable
             {
                 ClassId = cls.Id, AcademicYearId = year.Id,
-                IsActive = true, CreatedAt = now, UpdatedAt = now
+                Status = TimetableStatus.Active,
+                VersionNumber = 1,
+                PublishedAt = now,
+                CreatedAt = now,
+                UpdatedAt = now
             };
             ctx.Timetables.Add(tt);
             timetableByClass[cls.Id] = tt;

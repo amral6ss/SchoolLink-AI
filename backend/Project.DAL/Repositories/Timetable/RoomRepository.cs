@@ -28,6 +28,7 @@ public class RoomRepository : Repository<Room>, IRoomRepository
     public async Task<IReadOnlyList<Room>> GetAllOrderedAsync(
         CancellationToken ct = default)
         => await _context.Rooms
+            .Where(r => !r.IsDeleted)
             .OrderBy(r => r.Type)
             .ThenBy(r => r.Name)
             .ToListAsync(ct);
@@ -48,7 +49,7 @@ public class RoomRepository : Repository<Room>, IRoomRepository
                 s.RoomId == r.Id      &&
                 s.DayOfWeek == day    &&
                 s.PeriodNumber == periodNumber &&
-                s.Timetable.IsActive))
+                s.Timetable.Status == TimetableStatus.Active))
             .OrderBy(r => r.Type)
             .ThenBy(r => r.Name)
             .ToListAsync(ct);

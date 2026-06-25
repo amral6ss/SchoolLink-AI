@@ -50,7 +50,13 @@ public class MappingProfile : Profile
         // Timetable
         CreateMap<Timetable, TimetableDto>()
             .ForMember(d => d.ClassName,
-                opt => opt.MapFrom(s => s.Class.Name));
+                opt => opt.MapFrom(s => s.Class.Name))
+            .ForMember(d => d.IsActive,
+                opt => opt.MapFrom(s => s.Status == Project.Domain.Enums.TimetableStatus.Active))
+            .ForMember(d => d.Status,
+                opt => opt.MapFrom(s => s.Status.ToString()))
+            .ForMember(d => d.StatusValue,
+                opt => opt.MapFrom(s => (int)s.Status));
         CreateMap<Timetable, ChildScheduleDto>()
             .IncludeBase<Timetable, TimetableDto>();
 

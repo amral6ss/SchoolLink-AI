@@ -10,7 +10,6 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
 {
     public TimetableSlotRepository(AppDbContext context) : base(context) { }
 
-
     public async Task<IReadOnlyList<TimetableSlot>> GetByTimetableIdAsync(
         int timetableId,
         CancellationToken ct = default)
@@ -51,7 +50,6 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
             .ThenBy(s => s.PeriodNumber)
             .ToListAsync(ct);
 
-
     public async Task<IReadOnlyList<TimetableSlot>> GetByDayAsync(
         int timetableId,
         SchoolDay day,
@@ -77,7 +75,6 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
             .OrderBy(s => s.PeriodNumber)
             .ToListAsync(ct);
 
-
     public async Task<IReadOnlyList<TimetableSlot>> GetByClassSubjectTeacherIdAsync(
         int classSubjectTeacherId,
         CancellationToken ct = default)
@@ -89,7 +86,6 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
             .ThenBy(s => s.PeriodNumber)
             .ToListAsync(ct);
 
-
     public async Task<IReadOnlyList<TimetableSlot>> GetTeacherScheduleAsync(
         int teacherId,
         int academicYearId,
@@ -97,10 +93,10 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
         => await _context.TimetableSlots
             .AsNoTracking()
             .Where(s =>
-                s.ClassSubjectTeacher != null                                       &&
-                s.ClassSubjectTeacher.TeacherId      == teacherId                  &&
-                s.ClassSubjectTeacher.AcademicYearId == academicYearId             &&
-                s.Timetable.IsActive)
+                s.ClassSubjectTeacher != null &&
+                s.ClassSubjectTeacher.TeacherId == teacherId &&
+                s.ClassSubjectTeacher.AcademicYearId == academicYearId &&
+                s.Timetable.Status == TimetableStatus.Active)
             .Include(s => s.ClassSubjectTeacher)
                 .ThenInclude(cst => cst!.Subject)
             .Include(s => s.Timetable)
@@ -110,9 +106,6 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
             .ThenBy(s => s.PeriodNumber)
             .ToListAsync(ct);
 
-
-    // ── Slot conflict ──────────────────────────────────────────────────────────
-
     public async Task<bool> HasConflictAsync(
         int timetableId,
         SchoolDay day,
@@ -121,8 +114,8 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
         => await _context.TimetableSlots
             .AsNoTracking()
             .AnyAsync(s =>
-                s.TimetableId  == timetableId  &&
-                s.DayOfWeek    == day           &&
+                s.TimetableId == timetableId &&
+                s.DayOfWeek == day &&
                 s.PeriodNumber == periodNumber, ct);
 
     public async Task<bool> HasConflictAsync(
@@ -134,13 +127,10 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
         => await _context.TimetableSlots
             .AsNoTracking()
             .AnyAsync(s =>
-                s.Id           != excludedSlotId &&
-                s.TimetableId  == timetableId    &&
-                s.DayOfWeek    == day            &&
+                s.Id != excludedSlotId &&
+                s.TimetableId == timetableId &&
+                s.DayOfWeek == day &&
                 s.PeriodNumber == periodNumber, ct);
-
-
-    // ── Teacher conflict ───────────────────────────────────────────────────────
 
     public async Task<bool> HasTeacherConflictAsync(
         int teacherId,
@@ -151,11 +141,11 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
         => await _context.TimetableSlots
             .AsNoTracking()
             .AnyAsync(s =>
-                s.ClassSubjectTeacher != null                           &&
-                s.ClassSubjectTeacher.TeacherId      == teacherId       &&
-                s.ClassSubjectTeacher.AcademicYearId == academicYearId  &&
-                s.Timetable.IsActive                                    &&
-                s.DayOfWeek    == day                                   &&
+                s.ClassSubjectTeacher != null &&
+                s.ClassSubjectTeacher.TeacherId == teacherId &&
+                s.ClassSubjectTeacher.AcademicYearId == academicYearId &&
+                s.Timetable.Status == TimetableStatus.Active &&
+                s.DayOfWeek == day &&
                 s.PeriodNumber == periodNumber, ct);
 
     public async Task<bool> HasTeacherConflictAsync(
@@ -168,53 +158,55 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
         => await _context.TimetableSlots
             .AsNoTracking()
             .AnyAsync(s =>
-                s.Id          != excludedSlotId                         &&
-                s.ClassSubjectTeacher != null                           &&
-                s.ClassSubjectTeacher.TeacherId      == teacherId       &&
-                s.ClassSubjectTeacher.AcademicYearId == academicYearId  &&
-                s.Timetable.IsActive                                    &&
-                s.DayOfWeek    == day                                   &&
+                s.Id != excludedSlotId &&
+                s.ClassSubjectTeacher != null &&
+                s.ClassSubjectTeacher.TeacherId == teacherId &&
+                s.ClassSubjectTeacher.AcademicYearId == academicYearId &&
+                s.Timetable.Status == TimetableStatus.Active &&
+                s.DayOfWeek == day &&
                 s.PeriodNumber == periodNumber, ct);
 
-    /// <inheritdoc/>
     public async Task<string?> GetTeacherConflictClassNameAcrossAllAsync(
         int teacherId,
         int academicYearId,
         SchoolDay day,
         int periodNumber,
         int excludeTimetableId,
+        int excludeClassId,
+        int excludeAcademicYearId,
         int? excludeSlotId,
         CancellationToken ct = default)
     {
-        // نبحث عن أي slot آخر (منشور أو مسودة) محجوز فيه نفس المعلم في نفس اليوم/الحصة.
         var conflict = await _context.TimetableSlots
             .AsNoTracking()
             .Where(s =>
-                s.ClassSubjectTeacher != null                           &&
-                s.ClassSubjectTeacher.TeacherId      == teacherId       &&
-                s.ClassSubjectTeacher.AcademicYearId == academicYearId  &&
-                s.DayOfWeek    == day                                   &&
-                s.PeriodNumber == periodNumber                          &&
-                s.TimetableId  != excludeTimetableId                    &&
-                (excludeSlotId == null || s.Id != excludeSlotId.Value)  &&
-                !s.IsBreak                                               &&
-                !s.IsDeleted && !s.Timetable.IsDeleted)
+                s.ClassSubjectTeacher != null &&
+                s.ClassSubjectTeacher.TeacherId == teacherId &&
+                s.ClassSubjectTeacher.AcademicYearId == academicYearId &&
+                s.DayOfWeek == day &&
+                s.PeriodNumber == periodNumber &&
+                s.TimetableId != excludeTimetableId &&
+                !(s.Timetable.ClassId == excludeClassId &&
+                  s.Timetable.AcademicYearId == excludeAcademicYearId &&
+                  s.Timetable.Status == TimetableStatus.Active) &&
+                (excludeSlotId == null || s.Id != excludeSlotId.Value) &&
+                !s.IsBreak &&
+                !s.IsDeleted &&
+                !s.Timetable.IsDeleted &&
+                s.Timetable.Status != TimetableStatus.Archived)
             .Select(s => new
             {
-                ClassName     = s.Timetable.Class.Name,
-                SubjectName   = s.ClassSubjectTeacher!.Subject.Name,
-                s.Timetable.IsActive
+                ClassName = s.Timetable.Class.Name,
+                SubjectName = s.ClassSubjectTeacher!.Subject.Name,
+                s.Timetable.Status
             })
             .FirstOrDefaultAsync(ct);
 
         if (conflict is null) return null;
 
-        var status = conflict.IsActive ? "منشور" : "مسودة";
+        var status = conflict.Status == TimetableStatus.Active ? "منشور" : "مسودة";
         return $"المعلم يدرّس «{conflict.SubjectName}» للفصل «{conflict.ClassName}» ({status}) في نفس اليوم والحصة";
     }
-
-
-    // ── Room conflict ──────────────────────────────────────────────────────────
 
     public async Task<bool> HasRoomConflictAsync(
         int roomId,
@@ -224,8 +216,8 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
         => await _context.TimetableSlots
             .AsNoTracking()
             .AnyAsync(s =>
-                s.RoomId       == roomId        &&
-                s.DayOfWeek    == day           &&
+                s.RoomId == roomId &&
+                s.DayOfWeek == day &&
                 s.PeriodNumber == periodNumber, ct);
 
     public async Task<bool> HasRoomConflictAsync(
@@ -237,9 +229,9 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
         => await _context.TimetableSlots
             .AsNoTracking()
             .AnyAsync(s =>
-                s.Id           != excludedSlotId &&
-                s.RoomId       == roomId         &&
-                s.DayOfWeek    == day            &&
+                s.Id != excludedSlotId &&
+                s.RoomId == roomId &&
+                s.DayOfWeek == day &&
                 s.PeriodNumber == periodNumber, ct);
 
     public async Task<bool> HasRoomConflictAgainstActiveTimetablesAsync(
@@ -251,35 +243,40 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
         => await _context.TimetableSlots
             .AsNoTracking()
             .AnyAsync(s =>
-                s.RoomId       == roomId         &&
-                s.DayOfWeek    == day            &&
-                s.PeriodNumber == periodNumber   &&
-                s.TimetableId  != timetableId    &&
-                s.Timetable.IsActive, ct);
+                s.RoomId == roomId &&
+                s.DayOfWeek == day &&
+                s.PeriodNumber == periodNumber &&
+                s.TimetableId != timetableId &&
+                s.Timetable.Status == TimetableStatus.Active, ct);
 
-    /// <inheritdoc/>
     public async Task<RoomConflictInfo?> GetRoomConflictAcrossAllAsync(
         int roomId,
         SchoolDay day,
         int periodNumber,
         int excludeTimetableId,
+        int excludeClassId,
+        int excludeAcademicYearId,
         int? excludeSlotId,
         CancellationToken ct = default)
     {
-        // نبحث عن أي slot آخر (منشور أو مسودة) محجوز في نفس القاعة/اليوم/الحصة.
         var conflict = await _context.TimetableSlots
             .AsNoTracking()
             .Where(s =>
-                s.RoomId       == roomId              &&
-                s.DayOfWeek    == day                 &&
-                s.PeriodNumber == periodNumber        &&
-                s.TimetableId  != excludeTimetableId  &&
+                s.RoomId == roomId &&
+                s.DayOfWeek == day &&
+                s.PeriodNumber == periodNumber &&
+                s.TimetableId != excludeTimetableId &&
+                !(s.Timetable.ClassId == excludeClassId &&
+                  s.Timetable.AcademicYearId == excludeAcademicYearId &&
+                  s.Timetable.Status == TimetableStatus.Active) &&
                 (excludeSlotId == null || s.Id != excludeSlotId.Value) &&
-                !s.IsDeleted && !s.Timetable.IsDeleted)
+                !s.IsDeleted &&
+                !s.Timetable.IsDeleted &&
+                s.Timetable.Status != TimetableStatus.Archived)
             .Select(s => new
             {
                 s.Timetable.Class.Name,
-                s.Timetable.IsActive,
+                s.Timetable.Status,
                 SubjectName = s.ClassSubjectTeacher != null
                     ? s.ClassSubjectTeacher.Subject.Name
                     : null,
@@ -293,27 +290,32 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
 
         return new RoomConflictInfo
         {
-            ClassName    = conflict.Name,
-            SubjectName  = conflict.SubjectName,
-            TeacherName  = conflict.TeacherName,
-            IsOtherDraft = !conflict.IsActive
+            ClassName = conflict.Name,
+            SubjectName = conflict.SubjectName,
+            TeacherName = conflict.TeacherName,
+            IsOtherDraft = conflict.Status == TimetableStatus.Draft,
+            Status = conflict.Status
         };
     }
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<(int RoomId, SchoolDay DayOfWeek, int PeriodNumber)>> GetRoomConflictsAgainstActiveAsync(
         IEnumerable<(int RoomId, SchoolDay DayOfWeek, int PeriodNumber)> candidates,
         int excludeTimetableId,
+        int excludeClassId,
+        int excludeAcademicYearId,
         CancellationToken ct = default)
     {
         var list = candidates.ToList();
         if (list.Count == 0)
             return Array.Empty<(int, SchoolDay, int)>();
 
-        // تنفيذ عبر query واحدة بدل N query منفصلة (إصلاح N+1 في الـ validation).
         var conflicts = await _context.TimetableSlots
             .AsNoTracking()
-            .Where(s => s.Timetable.IsActive && s.TimetableId != excludeTimetableId && s.RoomId != null)
+            .Where(s => s.Timetable.Status == TimetableStatus.Active
+                     && s.TimetableId != excludeTimetableId
+                     && !(s.Timetable.ClassId == excludeClassId &&
+                          s.Timetable.AcademicYearId == excludeAcademicYearId)
+                     && s.RoomId != null)
             .Select(s => new { s.RoomId!.Value, s.DayOfWeek, s.PeriodNumber })
             .ToListAsync(ct);
 
@@ -324,10 +326,11 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
         return list.Where(c => conflictSet.Contains((c.RoomId, c.DayOfWeek, c.PeriodNumber))).ToList();
     }
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<(int TeacherId, SchoolDay DayOfWeek, int PeriodNumber)>> GetTeacherConflictsAgainstActiveAsync(
         IEnumerable<(int TeacherId, SchoolDay DayOfWeek, int PeriodNumber)> candidates,
         int excludeTimetableId,
+        int excludeClassId,
+        int excludeAcademicYearId,
         CancellationToken ct = default)
     {
         var list = candidates.ToList();
@@ -336,8 +339,10 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
 
         var conflicts = await _context.TimetableSlots
             .AsNoTracking()
-            .Where(s => s.Timetable.IsActive
+            .Where(s => s.Timetable.Status == TimetableStatus.Active
                      && s.TimetableId != excludeTimetableId
+                     && !(s.Timetable.ClassId == excludeClassId &&
+                          s.Timetable.AcademicYearId == excludeAcademicYearId)
                      && s.ClassSubjectTeacher != null
                      && !s.IsBreak)
             .Select(s => new { TeacherId = s.ClassSubjectTeacher!.TeacherId, s.DayOfWeek, s.PeriodNumber })
@@ -349,9 +354,6 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
 
         return list.Where(c => conflictSet.Contains((c.TeacherId, c.DayOfWeek, c.PeriodNumber))).ToList();
     }
-
-
-    // ── Bulk ──────────────────────────────────────────────────────────────────
 
     public async Task BulkReplaceAsync(
         int timetableId,
@@ -367,9 +369,6 @@ public class TimetableSlotRepository : Repository<TimetableSlot>, ITimetableSlot
 
         await _context.TimetableSlots.AddRangeAsync(slots, ct);
     }
-
-
-    // ── Details ───────────────────────────────────────────────────────────────
 
     public async Task<TimetableSlot?> GetByIdWithDetailsAsync(
         int slotId,

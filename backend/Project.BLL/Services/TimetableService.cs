@@ -57,7 +57,7 @@ public class TimetableService : ITimetableService
         //    على مستوى الـ DB هو مصدر الحقيقة النهائي ضد الـ race conditions).
         var existingTimetables = await _unitOfWork.Timetables
             .GetByClassAndYearAsync(request.ClassId, request.AcademicYearId, ct);
-        if (existingTimetables.Any(t => !t.IsActive))
+        if (existingTimetables.Any(t => t.Status == TimetableStatus.Draft))
             return OperationResult<TimetableDto>.Failure(
                 "توجد بالفعل مسودة جدول لهذا الفصل وهذه السنة الدراسية");
 
@@ -66,7 +66,8 @@ public class TimetableService : ITimetableService
         {
             ClassId        = request.ClassId,
             AcademicYearId = request.AcademicYearId,
-            IsActive       = false
+            Status         = TimetableStatus.Draft,
+            VersionNumber  = GetNextVersionNumber(existingTimetables)
         };
 
         await _unitOfWork.Timetables.AddAsync(entity, ct);
@@ -112,7 +113,7 @@ public class TimetableService : ITimetableService
         var existingTimetables = await _unitOfWork.Timetables
             .GetByClassAndYearWithDetailsAsync(classId, academicYearId, ct);
 
-        var hasExistingDraft = existingTimetables.Any(t => !t.IsActive);
+        var hasExistingDraft = existingTimetables.Any(t => t.Status == TimetableStatus.Draft);
 
         // لو فيه مسودة موجودة وما طلبناش الاستبدال → نفس السلوك القديم (آمن افتراضيًا).
         if (hasExistingDraft && !replaceExisting)
@@ -123,8 +124,8 @@ public class TimetableService : ITimetableService
         // ديليت جوه الـ transaction، فلازم نختار المصدر من الجداول «قبل» الحذف، ونتجنّب
         // اختيار المسودة القديمة نفسها كمصدر (نفضّل الجدول المنشور).
         var source = existingTimetables
-            .Where(t => t.IsActive) // فضّل المنشور كمصدر للنسخ
-            .OrderByDescending(t => t.CreatedAt)
+            .Where(t => t.Status == TimetableStatus.Active)
+            .OrderByDescending(t => t.PublishedAt ?? t.CreatedAt)
             .FirstOrDefault();
 
         // fallback: لو مفيش جدول منشور، استخدم أحدث مسودة (قبل حذفها) كمصدر
@@ -155,7 +156,9 @@ public class TimetableService : ITimetableService
         {
             ClassId = classId,
             AcademicYearId = academicYearId,
-            IsActive = false
+            Status = TimetableStatus.Draft,
+            VersionNumber = GetNextVersionNumber(existingTimetables),
+            SourceTimetableId = source.Id
         };
 
         // ── إصلاح جذري: كل العملية atomic في transaction واحدة ──
@@ -284,13 +287,17 @@ public class TimetableService : ITimetableService
     {
         var timetable = await _unitOfWork.Timetables.GetByIdAsync(timetableId, ct);
         if (timetable is null || timetable.IsDeleted)
-            return OperationResult.Failure("الجدول الدراسي غير موجود", 404);
-        if (timetable.IsActive)
-            return OperationResult.Success("الجدول الدراسي مفعل بالفعل");
+            return OperationResult.Failure("الجدول الدراسي غير موجود.", 404);
+
+        if (timetable.Status == TimetableStatus.Active)
+            return OperationResult.Success("الجدول الدراسي منشور بالفعل.");
+
+        if (timetable.Status == TimetableStatus.Archived)
+            return OperationResult.Failure("لا يمكن نشر نسخة مؤرشفة مباشرة. أنشئ مسودة جديدة منها ثم راجعها وانشرها.");
 
         var validation = await BuildValidationResultAsync(timetableId, ct);
         if (validation is null)
-            return OperationResult.Failure("الجدول الدراسي غير موجود", 404);
+            return OperationResult.Failure("الجدول الدراسي غير موجود.", 404);
         if (!validation.CanActivate)
         {
             var reasons = validation.Errors
@@ -299,12 +306,16 @@ public class TimetableService : ITimetableService
                 .ToList();
             var suffix = validation.Errors.Count > 3 ? "..." : string.Empty;
             return OperationResult.Failure(
-                $"لا يمكن تفعيل الجدول قبل معالجة الملاحظات الحرجة: {string.Join(" | ", reasons)}{suffix}");
+                $"لا يمكن نشر الجدول قبل معالجة التعارضات والملاحظات الحرجة: {string.Join(" | ", reasons)}{suffix}");
         }
 
-        // Transaction: deactivate current timetable, then activate this one.
-        // الـ unique filtered index (UX_Timetable_Active) يضمن عدم وجود جدولين نشطين
-        // حتى لو حصل تزامن في التفعيل.
+        var existingTimetables = await _unitOfWork.Timetables
+            .GetByClassAndYearAsync(timetable.ClassId, timetable.AcademicYearId, ct);
+        var now = DateTime.UtcNow;
+        var versionNumber = timetable.VersionNumber > 0
+            ? timetable.VersionNumber
+            : GetNextVersionNumber(existingTimetables);
+
         try
         {
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -312,8 +323,11 @@ public class TimetableService : ITimetableService
                 await _unitOfWork.Timetables.DeactivateByClassAndYearAsync(
                     timetable.ClassId, timetable.AcademicYearId, ct);
 
-                timetable.IsActive  = true;
-                timetable.UpdatedAt = DateTime.UtcNow;
+                timetable.Status        = TimetableStatus.Active;
+                timetable.VersionNumber = versionNumber;
+                timetable.PublishedAt   = now;
+                timetable.ArchivedAt    = null;
+                timetable.UpdatedAt     = now;
                 _unitOfWork.Timetables.Update(timetable);
                 await _unitOfWork.SaveChangesAsync(ct);
             }, ct);
@@ -321,14 +335,14 @@ public class TimetableService : ITimetableService
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
             return OperationResult.Failure(
-                "حدث تعارض أثناء التفعيل، قد يكون هناك جدول آخر قيد التفعيل. حاول مجددًا.");
+                "حدث تعارض أثناء النشر، قد يكون هناك جدول آخر نُشر في نفس اللحظة. حدّث الصفحة وحاول مرة أخرى.");
         }
 
         // Notification: إشعار الطلاب بتحديث الجدول (بره الـ transaction لتبقى صغيرة).
         // فشل الإشعار لا يلغي التفعيل — نسجّل التحذير فقط.
-        await NotifyScheduleChangedSafelyAsync(timetable.ClassId, "تم تعديل الجدول الدراسي للفصل، يرجى مراجعة الجدول");
+        await NotifyScheduleChangedSafelyAsync(timetable.ClassId, "تم نشر جدول دراسي جديد للفصل، يرجى مراجعة الجدول.");
 
-        return OperationResult.Success("تم تفعيل الجدول الدراسي بنجاح");
+        return OperationResult.Success("تم نشر الجدول الدراسي بنجاح.");
     }
 
     public async Task<OperationResult> DeactivateTimetableAsync(
@@ -336,19 +350,14 @@ public class TimetableService : ITimetableService
     {
         var timetable = await _unitOfWork.Timetables.GetByIdAsync(timetableId, ct);
         if (timetable is null || timetable.IsDeleted)
-            return OperationResult.Failure("الجدول الدراسي غير موجود", 404);
+            return OperationResult.Failure("الجدول الدراسي غير موجود.", 404);
 
-        if (!timetable.IsActive)
-            return OperationResult.Success("الجدول الدراسي غير مفعل بالفعل");
+        if (timetable.Status != TimetableStatus.Active)
+            return OperationResult.Success("الجدول الدراسي غير منشور بالفعل.");
 
-        var existingTimetables = await _unitOfWork.Timetables
-            .GetByClassAndYearAsync(timetable.ClassId, timetable.AcademicYearId, ct);
-        if (existingTimetables.Any(t => !t.IsActive && t.Id != timetableId))
-            return OperationResult.Failure(
-                "يوجد بالفعل مسودة أخرى لهذا الفصل وهذه السنة. افتحها من قائمة الجداول بدل إلغاء تفعيل الجدول المنشور.");
-
-        timetable.IsActive  = false;
-        timetable.UpdatedAt = DateTime.UtcNow;
+        timetable.Status     = TimetableStatus.Archived;
+        timetable.ArchivedAt = DateTime.UtcNow;
+        timetable.UpdatedAt  = DateTime.UtcNow;
 
         _unitOfWork.Timetables.Update(timetable);
         await _unitOfWork.SaveChangesAsync(ct);
@@ -356,9 +365,9 @@ public class TimetableService : ITimetableService
         // إصلاح: إشعار الطلاب أن الجدول لم يعد منشورًا (كان مفقودًا).
         await NotifyScheduleChangedSafelyAsync(
             timetable.ClassId,
-            "تم إلغاء نشر الجدول الدراسي مؤقتًا؛ قد تظهر البيانات القديمة حتى إعادة النشر.");
+            "تم إلغاء نشر الجدول الدراسي مؤقتًا. سيظهر للطلاب آخر جدول منشور متاح بعد إعادة النشر.");
 
-        return OperationResult.Success("تم إلغاء تفعيل الجدول الدراسي بنجاح");
+        return OperationResult.Success("تم إلغاء نشر الجدول الدراسي بنجاح.");
     }
 
     public async Task<OperationResult> DeleteTimetableAsync(
@@ -366,10 +375,10 @@ public class TimetableService : ITimetableService
     {
         var timetable = await _unitOfWork.Timetables.GetByIdAsync(timetableId, ct);
         if (timetable is null || timetable.IsDeleted)
-            return OperationResult.Failure("الجدول الدراسي غير موجود", 404);
+            return OperationResult.Failure("الجدول الدراسي غير موجود.", 404);
 
-        if (timetable.IsActive)
-            return OperationResult.Failure("لا يمكن حذف جدول دراسي مفعل، يجب إلغاء تفعيله أولا");
+        if (timetable.Status == TimetableStatus.Active)
+            return OperationResult.Failure("لا يمكن حذف جدول منشور. ألغِ النشر أولًا إذا كنت تريد إزالته.");
 
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
@@ -379,7 +388,7 @@ public class TimetableService : ITimetableService
             await _unitOfWork.SaveChangesAsync(ct);
         }, ct);
 
-        return OperationResult.Success("تم حذف الجدول الدراسي بنجاح");
+        return OperationResult.Success("تم حذف الجدول الدراسي بنجاح.");
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -393,9 +402,9 @@ public class TimetableService : ITimetableService
         var timetable = await _unitOfWork.Timetables.GetByIdAsync(request.TimetableId, ct);
         if (timetable is null || timetable.IsDeleted)
             return OperationResult<TimetableSlotDto>.Failure("الجدول الدراسي غير موجود", 404);
-        if (timetable.IsActive)
+        if (timetable.Status != TimetableStatus.Draft)
             return OperationResult<TimetableSlotDto>.Failure(
-                "لا يمكن تعديل جدول منشور مباشرة. أنشئ مسودة جديدة ثم فعّلها بعد المراجعة");
+                "لا يمكن تعديل هذا الجدول مباشرة. التعديل مسموح فقط على المسودة.");
 
         var effectiveClassSubjectTeacherId = request.IsBreak ? null : request.ClassSubjectTeacherId;
         var effectiveRoomId                = request.IsBreak ? null : request.RoomId;
@@ -428,7 +437,7 @@ public class TimetableService : ITimetableService
         //    SOFT WARNING (تعارض قاعة/معلم مع جدول آخر) → نسمح بالحفظ ونعرض التحذير،
         //    لأن الفحص القاطع بيحصل وقت التفعيل (Activate).
         var conflict = await ResolveSlotConflictsAsync(
-            timetable.Id, timetable.ClassId,
+            timetable.Id, timetable.ClassId, timetable.AcademicYearId,
             request.DayOfWeek, request.PeriodNumber,
             request.IsBreak, cst, effectiveRoomId,
             excludeSlotId: null, ct);
@@ -480,9 +489,9 @@ public class TimetableService : ITimetableService
         var timetable = await _unitOfWork.Timetables.GetByIdAsync(slot.TimetableId, ct);
         if (timetable is null || timetable.IsDeleted)
             return OperationResult<TimetableSlotDto>.Failure("الجدول الدراسي غير موجود", 404);
-        if (timetable.IsActive)
+        if (timetable.Status != TimetableStatus.Draft)
             return OperationResult<TimetableSlotDto>.Failure(
-                "لا يمكن تعديل جدول منشور مباشرة. أنشئ مسودة جديدة ثم فعّلها بعد المراجعة");
+                "لا يمكن تعديل هذا الجدول مباشرة. التعديل مسموح فقط على المسودة.");
 
         var effectiveClassSubjectTeacherId = request.IsBreak ? null : request.ClassSubjectTeacherId;
         var effectiveRoomId                = request.IsBreak ? null : request.RoomId;
@@ -513,7 +522,7 @@ public class TimetableService : ITimetableService
         // 4. كشف موحّد لكل التعارضات (يستثني الحصة الحالية بـ slot.Id).
         //    HARD BLOCK → منع، SOFT WARNING → نسمح ونعرض التحذير.
         var conflict = await ResolveSlotConflictsAsync(
-            timetable.Id, timetable.ClassId,
+            timetable.Id, timetable.ClassId, timetable.AcademicYearId,
             request.DayOfWeek, request.PeriodNumber,
             request.IsBreak, cst, effectiveRoomId,
             excludeSlotId: slot.Id, ct);
@@ -560,9 +569,9 @@ public class TimetableService : ITimetableService
         var timetable = await _unitOfWork.Timetables.GetByIdAsync(slot.TimetableId, ct);
         if (timetable is null || timetable.IsDeleted)
             return OperationResult.Failure("الجدول الدراسي غير موجود", 404);
-        if (timetable.IsActive)
+        if (timetable.Status != TimetableStatus.Draft)
             return OperationResult.Failure(
-                "لا يمكن حذف حصة من جدول منشور مباشرة. أنشئ مسودة جديدة ثم فعّلها بعد المراجعة");
+                "لا يمكن حذف حصة من هذا الجدول مباشرة. التعديل مسموح فقط على المسودة.");
 
         _unitOfWork.TimetableSlots.SoftDelete(slot);
         await _unitOfWork.SaveChangesAsync(ct);
@@ -588,9 +597,9 @@ public class TimetableService : ITimetableService
         var timetable = await _unitOfWork.Timetables.GetByIdAsync(timetableId, ct);
         if (timetable is null || timetable.IsDeleted)
             return OperationResult.Failure("الجدول الدراسي غير موجود", 404);
-        if (timetable.IsActive)
+        if (timetable.Status != TimetableStatus.Draft)
             return OperationResult.Failure(
-                "لا يمكن تعديل جدول منشور مباشرة. أنشئ مسودة جديدة ثم فعّلها بعد المراجعة");
+                "لا يمكن تعديل توقيت الحصص إلا في المسودة.");
 
         // 2. Time range validation (رخيص — أولًا).
         if (request.EndTime <= request.StartTime)
@@ -883,7 +892,7 @@ public class TimetableService : ITimetableService
 
         var roomConflicts = roomCandidates.Count > 0
             ? (await _unitOfWork.TimetableSlots.GetRoomConflictsAgainstActiveAsync(
-                roomCandidates, timetable.Id, ct))
+                roomCandidates, timetable.Id, timetable.ClassId, timetable.AcademicYearId, ct))
                 .ToHashSet()
             : new HashSet<(int, SchoolDay, int)>();
 
@@ -895,7 +904,7 @@ public class TimetableService : ITimetableService
 
         var teacherConflicts = teacherCandidates.Count > 0
             ? (await _unitOfWork.TimetableSlots.GetTeacherConflictsAgainstActiveAsync(
-                teacherCandidates, timetable.Id, ct))
+                teacherCandidates, timetable.Id, timetable.ClassId, timetable.AcademicYearId, ct))
                 .ToHashSet()
             : new HashSet<(int, SchoolDay, int)>();
 
@@ -1111,6 +1120,7 @@ public class TimetableService : ITimetableService
     private async Task<SlotConflictResult> ResolveSlotConflictsAsync(
         int timetableId,
         int classId,
+        int academicYearId,
         SchoolDay day,
         int periodNumber,
         bool isBreak,
@@ -1144,7 +1154,7 @@ public class TimetableService : ITimetableService
                 return SlotConflictResult.Blocked("القاعة المختارة غير موجودة أو محذوفة. اختر قاعة أخرى.");
 
             var roomConflict = await _unitOfWork.TimetableSlots.GetRoomConflictAcrossAllAsync(
-                roomId.Value, day, periodNumber, timetableId, excludeSlotId, ct);
+                roomId.Value, day, periodNumber, timetableId, classId, academicYearId, excludeSlotId, ct);
 
             if (roomConflict is not null)
             {
@@ -1166,7 +1176,7 @@ public class TimetableService : ITimetableService
             var teacherConflict = await _unitOfWork.TimetableSlots
                 .GetTeacherConflictClassNameAcrossAllAsync(
                     cst.TeacherId, cst.AcademicYearId, day, periodNumber,
-                    timetableId, excludeSlotId, ct);
+                    timetableId, classId, academicYearId, excludeSlotId, ct);
 
             if (teacherConflict is not null)
             {
@@ -1177,6 +1187,17 @@ public class TimetableService : ITimetableService
         }
 
         return warning is null ? SlotConflictResult.Ok : SlotConflictResult.WithWarning(warning);
+    }
+
+    private static int GetNextVersionNumber(IEnumerable<Timetable> timetables)
+    {
+        var maxVersion = timetables
+            .Where(t => !t.IsDeleted)
+            .Select(t => t.VersionNumber)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return maxVersion + 1;
     }
 
     /// <summary>
