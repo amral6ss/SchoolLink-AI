@@ -566,10 +566,10 @@
                         </span>
                       </td>
                       <td>
-                        <span class="tag tag-success" *ngIf="candidate.studentLifecycleStatus === 1">
+                        <span class="tag tag-success" *ngIf="candidate.studentLifecycleStatus === 'Active'">
                           {{ getLifecycleStatusLabel(candidate) }}
                         </span>
-                        <span class="tag tag-mute" *ngIf="candidate.studentLifecycleStatus !== 1">
+                        <span class="tag tag-mute" *ngIf="candidate.studentLifecycleStatus !== 'Active'">
                           {{ getLifecycleStatusLabel(candidate) }}
                         </span>
                       </td>

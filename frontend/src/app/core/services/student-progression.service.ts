@@ -6,6 +6,7 @@ import { buildApiUrl } from '../utils/api-url';
 // الـ backend بيرجع enums كنص (JsonStringEnumConverter في Program.cs)
 // فلازم نقارنها بـ string مش رقم.
 export type AcademicStatus = 'NoGrades' | 'Unpublished' | 'Passed' | 'Failed';
+export type StudentLifecycleStatus = 'Active' | 'Graduated' | 'Transferred' | 'Withdrawn';
 export type AcademicTermLabel = 'FirstSemester' | 'SecondSemester';
 // ProgressionTermScope ده query param بيُبعت رقم للـ backend، فسيبناها رقم.
 export type ProgressionTermScope = 1 | 2 | 3; // First=1, Second=2, Both=3
@@ -31,7 +32,7 @@ export interface StudentProgressionCandidate {
   academicYearId: number;
   academicYearName: string;
   studentIsActive: boolean;
-  studentLifecycleStatus: number;
+  studentLifecycleStatus: StudentLifecycleStatus;
   studentLifecycleStatusName: string;
   hasStudentAccount: boolean;
   hasFinalGrade: boolean;

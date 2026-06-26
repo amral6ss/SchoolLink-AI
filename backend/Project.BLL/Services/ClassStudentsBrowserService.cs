@@ -3,6 +3,7 @@ using Project.BLL.DTOs.ClassStudentsBrowser;
 using Project.BLL.DTOs.Common;
 using Project.BLL.Interfaces;
 using Project.DAL.Interfaces;
+using Project.Domain.Enums;
 
 namespace Project.BLL.Services;
 
@@ -39,7 +40,12 @@ public class ClassStudentsBrowserService : IClassStudentsBrowserService
             filter.AcademicYearId);
 
         var activeEnrollments = enrollments
-            .Where(e => !e.IsDeleted && e.Student is not null && !(e.Student?.IsDeleted ?? false))
+            .Where(e => !e.IsDeleted
+                && e.LeftAt is null
+                && e.Student is not null
+                && !(e.Student?.IsDeleted ?? false)
+                && e.Student!.IsActive
+                && e.Student.LifecycleStatus == StudentLifecycleStatus.Active)
             .ToList();
 
         var filteredEnrollments = activeEnrollments;
@@ -59,7 +65,7 @@ public class ClassStudentsBrowserService : IClassStudentsBrowserService
                 StudentId = e.StudentId,
                 StudentName = e.Student!.FullName,
                 Gender = e.Student.Gender,
-                IsActive = e.LeftAt is null && e.Student.IsActive,
+                IsActive = e.Student.IsActive && e.Student.LifecycleStatus == StudentLifecycleStatus.Active,
                 EnrolledAt = e.EnrolledAt
             })
             .ToList();

@@ -520,9 +520,9 @@ export class StudentProgression implements OnInit {
 
   getLifecycleStatusLabel(candidate: StudentProgressionCandidate): string {
     switch (candidate.studentLifecycleStatus) {
-      case 2: return 'متخرج';
-      case 3: return 'منقول خارج المدرسة';
-      case 4: return 'منسحب';
+      case 'Graduated': return 'متخرج';
+      case 'Transferred': return 'منقول خارج المدرسة';
+      case 'Withdrawn': return 'منسحب';
       default: return 'نشط';
     }
   }
