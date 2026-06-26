@@ -1,0 +1,437 @@
+<app-sidebar [(isOpen)]="sidebarOpen" />
+<div class="main-content">
+  <main>
+    <div class="cert-page">
+
+      <!-- ══ Top Bar ═══ -->
+      <div class="cert-topbar">
+        <div class="cert-topbar-info">
+          <span class="cert-icon material-symbols-outlined">badge</span>
+          <div>
+            <h1>الشهادات الدراسية</h1>
+            <p>تصميم وإدارة نماذج الشهادات وطباعة شهادات الطلاب</p>
+          </div>
+        </div>
+        <div class="cert-topbar-stats">
+          <div class="cert-stat">
+            <span class="cert-stat-num">{{ certificates().length }}</span>
+            <span class="cert-stat-label">شهادة</span>
+          </div>
+          <div class="cert-stat">
+            <span class="cert-stat-num">{{ totalSubjects() }}</span>
+            <span class="cert-stat-label">مادة</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ Messages ═══ -->
+      <div class="cert-msgs" *ngIf="errorMessage() || successMessage() || extractMessage">
+        <div *ngIf="errorMessage()" class="cert-msg cert-msg-error">
+          <span class="material-symbols-outlined">error</span> {{ errorMessage() }}
+        </div>
+        <div *ngIf="successMessage()" class="cert-msg cert-msg-success">
+          <span class="material-symbols-outlined">check_circle</span> {{ successMessage() }}
+        </div>
+        <div *ngIf="extractMessage" class="cert-msg cert-msg-info">
+          <span class="material-symbols-outlined">info</span> {{ extractMessage }}
+        </div>
+      </div>
+
+      <!-- ══ Two‑column layout ═══ -->
+      <div class="cert-grid">
+
+        <!-- ─── RIGHT COLUMN: Designer + Extractor ─── -->
+        <div class="cert-col-right">
+
+          <!-- ─── CERTIFICATE DESIGNER (form) ─── -->
+          <div class="cert-card">
+            <div class="cert-card-header">
+              <span class="material-symbols-outlined">edit_note</span>
+              <h2>{{ editingCertId() ? 'تعديل الشهادة' : 'شهادة جديدة' }}</h2>
+              <button class="cert-btn-preset" (click)="loadPresetHalfYear()">
+                <span class="material-symbols-outlined">auto_stories</span>
+                شهادة نصف العام
+              </button>
+            </div>
+
+            <div class="cert-card-body">
+              <!-- Meta fields -->
+              <div class="cert-meta-grid">
+                <div class="cert-field">
+                  <label>اسم الشهادة</label>
+                  <input type="text" [(ngModel)]="newCert.name" placeholder="مثل: شهادة نصف العام">
+                </div>
+                <div class="cert-field">
+                  <label>الصف الدراسي</label>
+                  <input type="text" [(ngModel)]="newCert.gradeLevel" placeholder="الصف الأول الإعدادى">
+                </div>
+                <div class="cert-field">
+                  <label>الترم</label>
+                  <input type="text" [(ngModel)]="newCert.term" placeholder="الأول">
+                </div>
+                <div class="cert-field">
+                  <label>دور الامتحان</label>
+                  <input type="text" [(ngModel)]="newCert.examRole" placeholder="الدور الأول">
+                </div>
+                <div class="cert-field">
+                  <label>العام الدراسي</label>
+                  <input type="text" [(ngModel)]="newCert.year" placeholder="2025/2026">
+                </div>
+              </div>
+
+              <!-- Subjects -->
+              <div class="cert-subjects-header">
+                <div class="cert-subjects-title">
+                  <span class="material-symbols-outlined">menu_book</span>
+                  <span>المواد الدراسية</span>
+                  <span class="cert-badge">{{ newCert.subjects.length }}</span>
+                  <span *ngIf="countedSubjects > 0" class="cert-badge cert-badge-amber">{{ countedSubjects }} أساسي</span>
+                </div>
+                <button class="cert-btn-sm cert-btn-outline" (click)="addSubject()">
+                  <span class="material-symbols-outlined">add</span> إضافة مادة
+                </button>
+              </div>
+
+              <div class="cert-table-wrap" *ngIf="newCert.subjects.length > 0; else noSubjs">
+                <table class="cert-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>المادة</th>
+                      <th>العظمى</th>
+                      <th>الصغرى</th>
+                      <th>أساسي</th>
+                      <th>ترتيب</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let sub of newCert.subjects; let i = index">
+                      <td class="cert-idx">{{ i + 1 }}</td>
+                      <td>
+                        <div class="cert-subj-cell">
+                          <input class="cert-inp" [(ngModel)]="sub.subjectName" placeholder="اسم المادة" (focus)="openPickerForRow(i)">
+                          <button class="cert-subj-pick-btn" type="button" (click)="openPickerForRow(i)" title="اختر من المواد المسجلة">
+                            <span class="material-symbols-outlined">list</span>
+                          </button>
+                        </div>
+                      </td>
+                      <td><input class="cert-inp cert-num" [(ngModel)]="sub.maxScore" type="number" min="0"></td>
+                      <td><input class="cert-inp cert-num" [(ngModel)]="sub.minScore" type="number" min="0"></td>
+                      <td class="cert-td-center">
+                        <label class="cert-toggle">
+                          <input type="checkbox" [checked]="sub.isCountedInTotal" (change)="toggleCounted(i)">
+                          <span></span>
+                        </label>
+                      </td>
+                      <td>
+                        <div class="cert-move">
+                          <button class="cert-move-btn" (click)="moveSubjectUp(i)" [disabled]="i === 0">
+                            <span class="material-symbols-outlined">arrow_upward</span>
+                          </button>
+                          <span class="cert-move-num">{{ sub.sortOrder }}</span>
+                          <button class="cert-move-btn" (click)="moveSubjectDown(i)" [disabled]="i >= newCert.subjects.length - 1">
+                            <span class="material-symbols-outlined">arrow_downward</span>
+                          </button>
+                        </div>
+                      </td>
+                      <td>
+                        <button class="cert-del-btn" (click)="removeSubject(i)">
+                          <span class="material-symbols-outlined">delete</span>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr class="cert-total-row" *ngIf="totalMax > 0">
+                      <td colspan="2" class="cert-total-label">مجموع الأساسي</td>
+                      <td class="cert-total-num">{{ totalMax }}</td>
+                      <td class="cert-total-num">{{ totalMin }}</td>
+                      <td colspan="3"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <ng-template #noSubjs>
+                <div class="cert-empty-sm">
+                  <span class="material-symbols-outlined">menu_book</span>
+                  <p>لم تضف أي مادة بعد — اضغط "إضافة مادة"</p>
+                </div>
+              </ng-template>
+
+              <!-- Actions -->
+              <div class="cert-actions">
+                <button *ngIf="editingCertId()" class="cert-btn cert-btn-ghost" (click)="cancelEdit()">إلغاء</button>
+                <button class="cert-btn cert-btn-primary" (click)="saveCert()">
+                  <span class="material-symbols-outlined">save</span>
+                  {{ editingCertId() ? 'تحديث' : 'حفظ الشهادة' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ SUBJECT PICKER OVERLAY ═══ -->
+          <div class="cert-picker-overlay" *ngIf="showSubjectPicker()" (click.self)="closeSubjectPicker()">
+            <div class="cert-picker-modal">
+              <div class="cert-picker-header">
+                <span class="material-symbols-outlined">list</span>
+                <h3>اختر مادة</h3>
+                <button class="cert-picker-close" (click)="closeSubjectPicker()">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div class="cert-picker-search">
+                <span class="material-symbols-outlined">search</span>
+                <input type="text" [(ngModel)]="pickerSearch" placeholder="ابحث عن مادة…" autofocus>
+              </div>
+              <div class="cert-picker-list">
+                <button class="cert-picker-item" *ngFor="let subj of pickerFilteredSubjects()" (click)="pickSubject(subj)">
+                  <span class="material-symbols-outlined">check_circle</span>
+                  <span>{{ subj.name }}</span>
+                </button>
+                <div class="cert-picker-empty" *ngIf="pickerFilteredSubjects().length === 0">
+                  <p>لا توجد مواد تطابق البحث</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── EXTRACT CERTIFICATES ─── -->
+          <div class="cert-card">
+            <div class="cert-card-header">
+              <span class="material-symbols-outlined">file_present</span>
+              <h2>استخراج الشهادات</h2>
+              <span class="cert-badge cert-badge-blue">Word</span>
+            </div>
+            <div class="cert-card-body">
+
+              <div class="cert-format-row">
+                <label class="cert-format-label">الصيغة :</label>
+                <div class="cert-format-group">
+                  <span class="cert-radio active">
+                    <span class="material-symbols-outlined">description</span>
+                    Word (.doc)
+                  </span>
+                </div>
+              </div>
+
+              <div class="cert-extract-grid">
+                <div class="cert-field">
+                  <label>نموذج الشهادة</label>
+                  <select [(ngModel)]="extractCertId">
+                    <option [ngValue]="null">— اختر —</option>
+                    <option *ngFor="let c of certificates()" [ngValue]="c.id">{{ c.name }} — {{ c.gradeLevel }}</option>
+                  </select>
+                </div>
+                <div class="cert-field">
+                  <label>الترم</label>
+                  <select [(ngModel)]="extractTerm">
+                    <option [ngValue]="1">الأول</option>
+                    <option [ngValue]="2">الثاني</option>
+                  </select>
+                </div>
+                <div class="cert-field">
+                  <label>الصف الدراسي (المرحلة)</label>
+                  <select [(ngModel)]="extractGradeLevelId" (change)="onGradeLevelChange()">
+                    <option [ngValue]="null">— اختر الصف —</option>
+                    <option *ngFor="let gl of allGradeLevels()" [ngValue]="gl.id">{{ gl.name }}</option>
+                  </select>
+                </div>
+                <div class="cert-field">
+                  <label>الفصل</label>
+                  <select [(ngModel)]="extractClassId" [disabled]="extractAllClasses">
+                    <option [ngValue]="null">— اختر الفصل —</option>
+                    <option *ngFor="let cls of filteredClasses" [ngValue]="cls.id">{{ cls.name }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- All classes checkbox -- only show when there are multiple classes -->
+              <div class="cert-all-classes" *ngIf="filteredClasses.length > 1">
+                <label class="cert-checkbox">
+                  <input type="checkbox" [(ngModel)]="extractAllClasses">
+                  <span class="cert-checkbox-mark"></span>
+                  <span>جميع فصول {{ (allGradeLevels().find(g => g.id === extractGradeLevelId)?.name) || 'هذا الصف' }}</span>
+                  <span class="cert-badge cert-badge-amber" *ngIf="extractAllClasses">{{ filteredClasses.length }} فصول</span>
+                </label>
+              </div>
+
+              <div class="cert-extract-actions">
+                <button class="cert-btn cert-btn-cyan" [disabled]="!extractCertId || !selectedClassIds || extracting"
+                        (click)="extractCertificates()">
+                  <span class="material-symbols-outlined">description</span>
+                  {{ extracting ? 'جاري…' : 'تصدير Word' }}
+                </button>
+                <button class="cert-btn cert-btn-purple" [disabled]="!extractCertId || !selectedClassIds || extracting"
+                        (click)="printGradeSheet()">
+                  <span class="material-symbols-outlined">table_chart</span>
+                  كشف الدرجات
+                </button>
+                <button class="cert-btn" style="background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;box-shadow:0 4px 14px rgba(13,148,136,.2)" [disabled]="!extractCertId || !selectedClassIds || extracting"
+                        (click)="printHonorRoll()">
+                  <span class="material-symbols-outlined">emoji_events</span>
+                  {{ extracting ? 'جاري…' : 'أوائل Word' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ─── LEFT COLUMN: Preview + Saved ─── -->
+        <div class="cert-col-left">
+
+          <!-- ─── LIVE PREVIEW ─── -->
+          <div class="cert-card">
+            <div class="cert-card-header">
+              <span class="material-symbols-outlined">visibility</span>
+              <h2>معاينة الشهادة</h2>
+              <span class="cert-badge cert-badge-amber" *ngIf="hasFormData()">مسودة</span>
+            </div>
+            <div class="cert-card-body">
+
+              <!-- Show live preview from form OR saved certificate -->
+              <div class="cert-preview-wrap" *ngIf="hasFormData()">
+                <div class="cert-preview-inner">
+                  <table class="cert-pv-top">
+                    <tr>
+                      <td class="cert-pv-spacer"></td>
+                      <td class="cert-pv-name">{{ newCert.name || '_____' }}</td>
+                      <td class="cert-pv-grade">{{ newCert.gradeLevel || '_____' }}</td>
+                    </tr>
+                    <tr>
+                      <td colspan="3" class="cert-pv-exam">
+                        امتحان {{ newCert.examRole || '' }} {{ newCert.term || '' }} لعام {{ newCert.year || '' }}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="cert-pv-student"><strong>اسم الطالب :</strong> ________________________</td>
+                      <td colspan="2" class="cert-pv-seat"><strong>رقم الجلوس :</strong> ________</td>
+                    </tr>
+                  </table>
+
+                  <table class="cert-pv-table">
+                    <thead>
+                      <tr>
+                        <th class="cert-pv-row-head">المادة</th>
+                        <th *ngFor="let sub of newCert.subjects">{{ sub.subjectName || '(مادة)' }}</th>
+                        <th class="cert-pv-total-head">المجموع</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td class="cert-pv-row-head">العظمى</td>
+                        <td class="cert-pv-center" *ngFor="let sub of newCert.subjects">{{ sub.maxScore }}</td>
+                        <td class="cert-pv-total-cell">{{ totalMax + newCert.subjects.filter(s => !s.isCountedInTotal).reduce((a,b) => a + b.maxScore, 0) }}</td>
+                      </tr>
+                      <tr>
+                        <td class="cert-pv-row-head">الصغرى</td>
+                        <td class="cert-pv-center" *ngFor="let sub of newCert.subjects">{{ sub.minScore }}</td>
+                        <td class="cert-pv-total-cell">{{ newCert.subjects.reduce((a,b) => a + b.minScore, 0) }}</td>
+                      </tr>
+                      <tr class="cert-pv-score-row">
+                        <td class="cert-pv-row-head">تقويمات</td>
+                        <td class="cert-pv-center" *ngFor="let sub of newCert.subjects">—</td>
+                        <td class="cert-pv-total-cell">—</td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div class="cert-pv-footer">
+                    <div><div>لجنة النظام والمراقبة</div><div class="cert-pv-sig-line"></div></div>
+                    <div><div>مدير المدرسة</div><div class="cert-pv-sig-line"></div></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="cert-preview-placeholder" *ngIf="!hasFormData() && certificates().length === 0">
+                <span class="material-symbols-outlined">badge</span>
+                <p>املأ البيانات على اليسار لترى معاينة حية</p>
+              </div>
+              <div class="cert-preview-placeholder" *ngIf="!hasFormData() && certificates().length > 0">
+                <span class="material-symbols-outlined">badge</span>
+                <p>اختر شهادة من الجدول أو ابدأ تصميم شهادة جديدة</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── SAVED CERTIFICATES ─── -->
+          <div class="cert-card">
+            <div class="cert-card-header">
+              <span class="material-symbols-outlined">badge</span>
+              <h2>الشهادات المسجلة</h2>
+              <span class="cert-badge">{{ certificates().length }}</span>
+            </div>
+
+            <div class="cert-search">
+              <input type="text" [(ngModel)]="searchTerm" (keyup.enter)="onSearch()"
+                     (ngModelChange)="!$event && clearSearch()"
+                     placeholder="بحث…" class="cert-search-inp">
+              <button class="cert-search-btn" (click)="onSearch()">
+                <span class="material-symbols-outlined">search</span>
+              </button>
+              <button *ngIf="searchTerm" class="cert-search-clear" (click)="clearSearch()">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div class="cert-list">
+              <div *ngFor="let cert of paginatedCerts(); let i = index" class="cert-list-item">
+                <div class="cert-list-body">
+                  <div class="cert-list-icon">
+                    <span class="material-symbols-outlined">badge</span>
+                  </div>
+                  <div class="cert-list-info">
+                    <div class="cert-list-name">{{ cert.name }}</div>
+                    <div class="cert-list-meta">{{ cert.gradeLevel }} · {{ cert.term }} · {{ cert.year }}</div>
+                    <div class="cert-list-subs">{{ (cert.subjects || []).length }} مادة · {{ (cert.subjects || []).filter(s => s.isCountedInTotal).length }} أساسي</div>
+                  </div>
+                </div>
+                <div class="cert-list-actions">
+                  <button class="cert-list-btn" title="طباعة" (click)="printCertificate(cert.id)">
+                    <span class="material-symbols-outlined">print</span>
+                  </button>
+                  <button class="cert-list-btn cert-list-edit" title="تعديل" (click)="editCert(cert)">
+                    <span class="material-symbols-outlined">edit</span>
+                  </button>
+                  <button class="cert-list-btn cert-list-del" title="حذف" (click)="deleteCert(cert.id)">
+                    <span class="material-symbols-outlined">delete</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="cert-list-empty" *ngIf="certificates().length === 0">
+                <span class="material-symbols-outlined">badge</span>
+                <p>لا توجد شهادات بعد</p>
+                <span>أنشئ شهادة من النموذج على اليمين</span>
+              </div>
+            </div>
+
+            <div class="cert-pagi" *ngIf="totalPages() > 1">
+              <span>{{ rangeStart() }}–{{ rangeEnd() }} من {{ certificates().length }}</span>
+              <div>
+                <button [disabled]="currentPage() === 1" (click)="prevPage()">‹</button>
+                <button *ngFor="let p of pages()" [class.active]="p === currentPage()"
+                        (click)="goToPage(+p)" [disabled]="p === '...'">{{ p }}</button>
+                <button [disabled]="currentPage() === totalPages()" (click)="nextPage()">›</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ══ Delete confirm ═══ -->
+      <div class="cert-confirm-overlay" *ngIf="deleteCertConfirmId()"
+           (click)="cancelDeleteCert()">
+        <div class="cert-confirm" (click)="$event.stopPropagation()">
+          <span class="material-symbols-outlined">warning</span>
+          <p>هل أنت متأكد من حذف هذه الشهادة؟</p>
+          <div>
+            <button class="cert-btn cert-btn-ghost" (click)="cancelDeleteCert()">إلغاء</button>
+            <button class="cert-btn cert-btn-danger" (click)="confirmDeleteCert()">تأكيد الحذف</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>

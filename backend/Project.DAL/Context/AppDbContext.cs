@@ -59,6 +59,8 @@ public class AppDbContext : DbContext
     public DbSet<AIGenerationLog> AIGenerationLogs => Set<AIGenerationLog>();
     public DbSet<AIReport> AIReports => Set<AIReport>();
     public DbSet<SchoolProfile> SchoolProfiles => Set<SchoolProfile>();
+    public DbSet<Certificate> Certificates => Set<Certificate>();
+    public DbSet<CertificateSubject> CertificateSubjects => Set<CertificateSubject>();
 
     public DbSet<QuestionBank> QuestionBank => Set<QuestionBank>();
     public DbSet<ExamQuestionBankItem> ExamQuestionBankItems => Set<ExamQuestionBankItem>();

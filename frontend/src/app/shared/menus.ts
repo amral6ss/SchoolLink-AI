@@ -31,6 +31,7 @@ export const ADMIN_MENU: SidebarMenuSection[] = [
       { label: 'إدارة المواد',    icon: 'menu_book',                 route: '/subject-management' },
       { label: 'إدارة القاعات',   icon: 'door_open',                 route: '/room-management'    },
       { label: 'إدارة الامتحانات',icon: 'fact_check',                route: '/exam-management'    },
+      { label: 'الشهادات',       icon: 'badge',                     route: '/certificate-management' },
       { label: 'تقييم الحصص',     icon: 'feedback',                  route: '/lesson-feedback'    },
     ],
   },
