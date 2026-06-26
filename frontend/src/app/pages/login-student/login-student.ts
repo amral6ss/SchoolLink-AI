@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { SchoolProfileService } from '../../core/services/school-profile.service';
 
 @Component({
   selector: 'app-login-student',
@@ -9,9 +10,18 @@ import { AuthService } from '../../core/services/auth.service';
   templateUrl: './login-student.html',
   styleUrl: './login-student.css'
 })
-export class LoginStudent {
+export class LoginStudent implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private schoolProfileSvc = inject(SchoolProfileService);
+  schoolPhone = signal('');
+
+  ngOnInit() {
+    this.schoolProfileSvc.get().subscribe({
+      next: p => { if (p?.phone) this.schoolPhone.set(p.phone); },
+      error: () => {}
+    });
+  }
 
   togglePwd(pwd: HTMLInputElement) {
     pwd.type = pwd.type === 'password' ? 'text' : 'password';

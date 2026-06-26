@@ -709,6 +709,41 @@
             </div>
           </div>
         } @else {
+          <!-- AI Grading Section -->
+          @if (!ga.isGraded) {
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center gap-3">
+                <button class="flex items-center gap-2 px-5 py-2.5 rounded-xl border-0 text-white font-bold text-sm cursor-pointer transition-all duration-300 active:scale-[0.97]"
+                  [style.background]="'linear-gradient(135deg, #1e3a5f, #2563eb)'"
+                  [style.boxShadow]="'0 4px 16px rgba(30,58,95,0.4)'"
+                  [style.fontFamily]="'inherit'"
+                  (click)="aiGradeAttempt()" [disabled]="aiGradingLoading()"
+                  onmouseover="this.style.boxShadow='0 6px 24px rgba(30,58,95,0.55)'"
+                  onmouseout="this.style.boxShadow='0 4px 16px rgba(30,58,95,0.4)'">
+                  @if (aiGradingLoading()) {
+                    <span class="material-symbols-outlined animate-spin" style="animation-duration:1.5s;">progress_activity</span>
+                    <span>جاري التصحيح بالذكاء الاصطناعي...</span>
+                  } @else {
+                    <span class="material-symbols-outlined">auto_awesome</span>
+                    <span>تصحيح بالذكاء الاصطناعي</span>
+                  }
+                </button>
+                @if (aiGradeSuggestions(); as suggestions) {
+                  <span class="font-label-sm text-green-700 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]" style="font-variation-settings:'FILL'1;">check_circle</span>
+                    تم التصحيح — {{ suggestions.length }} سؤال
+                  </span>
+                }
+              </div>
+              @if (aiGradeError()) {
+                <div class="rounded-xl border border-warning/20 bg-warning/10 px-4 py-2 text-warning font-label-sm text-label-sm">
+                  <span class="material-symbols-outlined text-[16px]" style="vertical-align:middle;">warning</span>
+                  {{ aiGradeError() }}
+                </div>
+              }
+            </div>
+          }
+
           @for (ans of ga.answers; track ans.id) {
             <div class="border border-white/40 bg-white/30 backdrop-blur-sm rounded-2xl p-4 flex flex-col gap-3">
               <div class="flex items-center gap-3">
@@ -718,6 +753,14 @@
                 @if (ans.questionType === 'fill-blank') { <span class="qtype-badge qtype-fill">أكمل الفراغ</span> }
                 @if (ans.questionType === 'essay') { <span class="qtype-badge qtype-essay">مقالي</span> }
                 <span class="mr-auto text-outline font-label-sm">حد أقصى: {{ ans.questionPoints }}</span>
+                <!-- AI Suggestion Badge -->
+                @if (ans._aiSuggested !== undefined) {
+                  <span class="flex items-center gap-1 px-2 py-0.5 rounded-full text-label-xs font-bold"
+                    style="background:rgba(245,158,11,0.15);color:#b45309;">
+                    <span class="material-symbols-outlined text-[14px]">auto_awesome</span>
+                    AI: {{ ans._aiSuggested }}
+                  </span>
+                }
               </div>
               <p class="font-body-lg text-body-lg">{{ ans.questionText }}</p>
               <div class="bg-white/40 backdrop-blur-sm rounded-xl px-4 py-3">
@@ -748,9 +791,25 @@
                       <p class="font-body-md text-body-md">{{ ans.correctAnswerText }}</p>
                     </div>
                   }
+                  <!-- AI Justification -->
+                  @if (ans._aiJustification) {
+                    <div class="flex items-start gap-2 px-3 py-2 rounded-xl text-label-sm"
+                      style="background:rgba(245,158,11,0.08);">
+                      <span class="material-symbols-outlined text-[16px]" style="color:#b45309;">auto_awesome</span>
+                      <span class="text-outline">{{ ans._aiJustification }}</span>
+                    </div>
+                  }
                   <label class="font-label-md text-label-md" style="font-weight:600;">الدرجة (0 – {{ ans.questionPoints }})</label>
-                  <input type="number" class="glass-input w-32" [min]="0" [max]="ans.questionPoints"
-                    [ngModel]="ans.pointsEarned" (ngModelChange)="setEssayGrade(ans.id, +$event)" />
+                  <div class="flex items-center gap-3">
+                    <input type="number" class="glass-input w-32" [min]="0" [max]="ans.questionPoints"
+                      [ngModel]="ans.pointsEarned" (ngModelChange)="setEssayGrade(ans.id, +$event)" />
+                    @if (ans._aiSuggested !== undefined && ans._aiSuggested !== ans.pointsEarned) {
+                      <button class="text-label-xs px-2 py-1 rounded-lg border border-warning/30 text-warning font-bold hover:bg-warning/10 transition-colors"
+                        (click)="setEssayGrade(ans.id, ans._aiSuggested!)">
+                        استعادة اقتراح AI ({{ ans._aiSuggested }})
+                      </button>
+                    }
+                  </div>
                   <label class="font-label-md text-label-md" style="font-weight:600;">ملاحظة (اختياري)</label>
                   <textarea class="glass-input resize-none" rows="2" placeholder="تغذية راجعة للطالب..."
                     [value]="ans.feedback ?? ''" (input)="setEssayFeedback(ans.id, $any($event.target).value)"></textarea>

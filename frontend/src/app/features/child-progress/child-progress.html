@@ -55,8 +55,8 @@
         <div class="flex items-center gap-3">
           <label class="font-label-sm text-label-sm text-outline">الفصل الدراسي:</label>
           <select (change)="onTermChange($event)" class="glass-select" style="padding:8px 16px;border-radius:12px;border:1px solid var(--outline-variant, #e0e0e0);background:rgba(255,255,255,0.7);backdrop-filter:blur(8px);">
-            <option value="1">الترم الأول</option>
-            <option value="2">الترم الثاني</option>
+            <option value="1" [selected]="selectedTerm() === 1">الترم الأول</option>
+            <option value="2" [selected]="selectedTerm() === 2">الترم الثاني</option>
           </select>
         </div>
       </div>
@@ -128,7 +128,7 @@
                   <div class="flex justify-between items-start">
                     <div>
                       <div class="flex items-center gap-2 mb-1"><span class="px-2 py-0.5 bg-white/40 backdrop-blur-sm rounded text-label-sm text-outline">{{ e.subject }}</span></div>
-                      <h3 class="font-headline-md text-headline-md" style="font-weight:700;">امتحان {{ e.subject }}</h3>
+                      <h3 class="font-headline-md text-headline-md" style="font-weight:700;">{{ e.title || 'امتحان ' + e.subject }}</h3>
                       <p class="text-label-sm text-outline mt-1">{{ e.date }}</p>
                     </div>
                     <div class="text-left">
@@ -143,6 +143,13 @@
                       <span class="font-label-sm text-label-sm" style="font-weight:700;background:linear-gradient(135deg,#f59e0b,#d97706);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">{{ e.score }}/{{ e.maxScore }}</span>
                     </div>
                   }
+                  @if (e.status === 'done' || e.status === 'pending') {
+                    <div class="flex justify-end mt-2">
+                      <button class="text-label-sm font-bold" style="color:var(--md-sys-color-primary);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:8px;" (click)="viewExamDetail(e.id)">
+                        <span class="material-symbols-outlined" style="font-size:1rem;">visibility</span> عرض التفاصيل
+                      </button>
+                    </div>
+                  }
                 </div>
               </div>
             </div>
@@ -153,3 +160,89 @@
     </div>
   </main>
 </div>
+
+<!-- Exam Detail Modal -->
+@if (examDetail(); as detail) {
+  <div class="modal-overlay" (click)="closeExamDetail()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="font-headline-lg text-headline-lg" style="font-weight:700;">{{ detail.title || 'امتحان ' + detail.subject }}</h2>
+        <button (click)="closeExamDetail()" style="background:none;border:none;cursor:pointer;font-size:1.5rem;color:var(--outline);padding:4px;border-radius:8px;">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <div class="glass-card p-4 mb-4">
+        <div class="flex items-center gap-2 text-label-sm text-outline mb-2">
+          <span class="px-2 py-0.5 bg-white/40 backdrop-blur-sm rounded">{{ detail.subject }}</span>
+          <span>·</span>
+          <span>{{ detail.studentName }}</span>
+        </div>
+        @if (detail.score !== null && detail.score !== undefined) {
+          <div class="flex items-center gap-2">
+            <span class="font-label-sm" style="font-weight:700;background:linear-gradient(135deg,#f59e0b,#d97706);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">{{ detail.score }}/{{ detail.maxScore }}</span>
+            <span class="text-label-sm text-outline">({{ detail.message }})</span>
+          </div>
+        } @else {
+          <p class="text-label-sm text-outline">{{ detail.message }}</p>
+        }
+      </div>
+
+      @if (detail.answers.length > 0) {
+        <div class="flex flex-col gap-stack-md">
+          @for (ans of detail.answers; track ans.questionId; let i = $index) {
+            <div class="glass-card p-4"
+              [style.border-right]="'4px solid ' + (ans.isCorrect ? '#0d7a5f' : ans.isCorrect === false ? '#dc2626' : '#9ca3af')">
+              <div class="flex items-start gap-3">
+                <span class="font-label-sm font-bold text-outline" style="min-width:24px;">{{ i + 1 }}</span>
+                <div class="flex-1">
+                  <p class="font-label-md font-bold mb-2">{{ ans.questionText }}</p>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <p class="text-label-xs text-outline mb-1">إجابة الطالب:</p>
+                      <p class="font-label-md px-3 py-1.5 rounded-lg"
+                        [style.background]="ans.isCorrect ? 'rgba(13,122,95,0.1)' : ans.isCorrect === false ? 'rgba(220,38,38,0.1)' : 'rgba(0,0,0,0.05)'"
+                        [style.color]="ans.isCorrect ? '#0d7a5f' : ans.isCorrect === false ? '#dc2626' : 'inherit'">
+                        {{ ans.answerText || 'لم يجب' }}
+                        @if (ans.isCorrect === true) {
+                          <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;color:#0d7a5f;">check_circle</span>
+                        } @else if (ans.isCorrect === false) {
+                          <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;color:#dc2626;">cancel</span>
+                        }
+                      </p>
+                    </div>
+                    @if (ans.correctAnswerText) {
+                      <div>
+                        <p class="text-label-xs text-outline mb-1">الإجابة الصحيحة:</p>
+                        <p class="font-label-md px-3 py-1.5 rounded-lg" style="background:rgba(13,122,95,0.1);color:#0d7a5f;">
+                          {{ ans.correctAnswerText }}
+                        </p>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="flex items-center gap-3 mt-2">
+                    <span class="text-label-sm"
+                      [style.color]="ans.isCorrect ? '#0d7a5f' : '#dc2626'"
+                      style="font-weight:600;">
+                      {{ ans.pointsEarned }}/{{ ans.questionPoints }} نقطة
+                    </span>
+                    @if (ans.aIFeedback) {
+                      <span class="text-label-xs text-outline flex items-center gap-1" style="background:rgba(245,158,11,0.1);padding:2px 8px;border-radius:20px;">
+                        <span class="material-symbols-outlined" style="font-size:0.85rem;">auto_awesome</span>
+                        {{ ans.aIFeedback }}
+                      </span>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      } @else if (detail.status === 'done') {
+        <p class="text-body-md text-outline text-center mt-4">لم يتم عرض الإجابات — النتيجة لم تنشر بعد</p>
+      }
+    </div>
+  </div>
+}

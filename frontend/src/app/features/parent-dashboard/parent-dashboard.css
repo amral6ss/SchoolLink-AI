@@ -11,6 +11,37 @@
   transform: translateY(-2px);
 }
 
+.btn-export-dash {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: #fff;
+  color: #dc2626;
+  border: 1.5px solid #dc262640;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-export-dash:hover { background: #fef2f2; border-color: #dc2626; }
+.btn-export-dash:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #dc262630;
+  border-top-color: #dc2626;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .stat-box {
   background: var(--surface-container-low, #f8fafc);
   border-radius: 12px;

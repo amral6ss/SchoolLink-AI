@@ -116,6 +116,33 @@
     </div>
   </section>
 
+  <!-- Contact Administration -->
+  @if (schoolProfile(); as sp) {
+    <section style="background:linear-gradient(135deg,#f0f4ff 0%,#eef2ff 100%);padding:60px 24px;">
+      <div class="max-w-6xl mx-auto">
+        <h2 style="font-size:28px;font-weight:700;color:#1a1b21;text-align:center;margin-bottom:12px;">تواصل مع الإدارة</h2>
+        <p style="font-size:15px;color:#444651;text-align:center;margin-bottom:36px;">للتواصل مع إدارة المدرسة يمكنكم الاتصال على الرقم التالي</p>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+          <div style="display:flex;align-items:center;gap:12px;padding:20px 36px;background:#fff;border-radius:20px;box-shadow:0 4px 20px rgba(0,35,111,0.1);border:1px solid rgba(0,35,111,0.1);">
+            <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#00236f,#3b82f6);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="color:#fff;font-size:28px;font-variation-settings:'FILL'1;">phone_in_talk</span>
+            </div>
+            <div style="text-align:right;">
+              <p style="font-size:13px;color:#64748b;font-weight:600;margin:0 0 4px;">{{ sp.schoolName }}</p>
+              <p style="font-size:24px;font-weight:800;color:#00236f;margin:0;direction:ltr;text-align:left;">{{ sp.phone }}</p>
+            </div>
+          </div>
+          @if (sp.educationalAdministration) {
+            <p style="font-size:13px;color:#64748b;font-weight:600;margin:0;">
+              <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">account_balance</span>
+              {{ sp.educationalAdministration }}
+            </p>
+          }
+        </div>
+      </div>
+    </section>
+  }
+
   <!-- Footer -->
   <footer style="background:#1a1b1f;padding:48px 24px;text-align:center;position:relative;">
     <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);"></div>

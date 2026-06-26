@@ -1,6 +1,6 @@
 import { Component, signal, OnInit, inject } from '@angular/core';
 import { Sidebar } from '../../layouts/sidebar/sidebar';
-import { ChildProgressService, ChildProgressItem } from './child-progress.service';
+import { ChildProgressService, ChildProgressItem, ChildExamAttemptResult, ChildExamAnswer } from './child-progress.service';
 import { AcademicYearService } from '../../core/services/academic-year.service';
 
 interface AssignmentView {
@@ -16,8 +16,9 @@ interface AssignmentView {
 interface ExamView {
   id: number;
   subject: string;
+  title: string;
   date: string;
-  status: 'upcoming' | 'done' | 'missed';
+  status: 'upcoming' | 'done' | 'missed' | 'pending';
   score?: number;
   maxScore: number;
 }
@@ -26,7 +27,30 @@ interface ExamView {
   selector: 'app-child-progress',
   imports: [Sidebar],
   templateUrl: './child-progress.html',
-  styleUrl: './child-progress.css'
+  styles: [`
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+      z-index: 1000;
+      overflow-y: auto;
+    }
+    .modal-content {
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px;
+      max-width: 720px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+  `]
 })
 export class ChildProgress implements OnInit {
   private service = inject(ChildProgressService);
@@ -43,17 +67,30 @@ export class ChildProgress implements OnInit {
   exams = signal<ExamView[]>([]);
 
   loading = signal(false);
-  selectedTerm = signal<number>(1);
+  selectedTerm = signal<number>(0); // 0 يعني لم يتم التحديد بعد
+
+  // Exam detail modal
+  examDetail = signal<ChildExamAttemptResult | null>(null);
+  examDetailLoading = signal(false);
 
   ngOnInit() {
-    this.loadData();
-
+    // استنى الترم الحالي الأول قبل تحميل البيانات
     this.academicYearService.getCurrentTerm().subscribe({
       next: (res) => {
-        if (res?.data != null && this.selectedTerm() !== res.data) {
-          this.selectedTerm.set(res.data);
-          this.loadData();
+        if (res?.data != null) {
+          // Backend may serialise AcademicTerm as string name ("SecondSemester")
+          // or as integer — normalise to int before storing
+          const termMap: Record<string, number> = { FirstSemester: 1, SecondSemester: 2, Final: 3 };
+          const term = typeof res.data === 'number' ? res.data : (termMap[res.data as string] ?? 1);
+          this.selectedTerm.set(term);
+        } else {
+          this.selectedTerm.set(1);
         }
+        this.loadData();
+      },
+      error: () => {
+        this.selectedTerm.set(1);
+        this.loadData();
       }
     });
   }
@@ -93,6 +130,7 @@ export class ChildProgress implements OnInit {
     this.exams.set(child.exams.map(e => ({
       id: e.id,
       subject: e.subject,
+      title: e.title,
       date: e.date ?? '',
       status: e.status as ExamView['status'],
       score: e.score,
@@ -113,12 +151,28 @@ export class ChildProgress implements OnInit {
   }
 
   getStatusText(s: string): string {
-    const m: Record<string, string> = { submitted: 'تم التسليم', 'not-submitted': 'لم يسلّم', late: 'متأخر', upcoming: 'قادم', done: 'أدّاه', missed: 'لم يؤدّه' };
+    const m: Record<string, string> = { submitted: 'تم التسليم', 'not-submitted': 'لم يسلّم', late: 'متأخر', pending: 'قيد التصحيح', upcoming: 'قادم', done: 'أدّاه', missed: 'لم يؤدّه' };
     return m[s] || s;
   }
 
   getStatusClass(s: string): string {
-    const m: Record<string, string> = { submitted: 'bg-green-50 text-green-700', 'not-submitted': 'bg-secondary/10 text-secondary', late: 'bg-error/10 text-error', upcoming: 'bg-secondary/10 text-secondary', done: 'bg-green-50 text-green-700', missed: 'bg-error/10 text-error' };
+    const m: Record<string, string> = { submitted: 'bg-green-50 text-green-700', 'not-submitted': 'bg-secondary/10 text-secondary', late: 'bg-error/10 text-error', pending: 'bg-amber-50 text-amber-700', upcoming: 'bg-secondary/10 text-secondary', done: 'bg-green-50 text-green-700', missed: 'bg-error/10 text-error' };
     return m[s] || '';
+  }
+
+  viewExamDetail(examId: number) {
+    this.examDetailLoading.set(true);
+    this.examDetail.set(null);
+    this.service.getExamAttempt(examId).subscribe({
+      next: (result) => {
+        this.examDetail.set(result);
+        this.examDetailLoading.set(false);
+      },
+      error: () => this.examDetailLoading.set(false),
+    });
+  }
+
+  closeExamDetail() {
+    this.examDetail.set(null);
   }
 }

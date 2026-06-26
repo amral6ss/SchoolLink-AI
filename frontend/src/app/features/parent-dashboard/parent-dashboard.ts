@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, signal, ViewChild, ElementRef, AfterViewInit, effect } from '@angular/core';
 import { Sidebar } from '../../layouts/sidebar/sidebar';
+import { PdfExportService, PdfDashboardData } from '../../core/services/pdf-export.service';
 import {
   ParentDashboardChild, ParentDashboardData, ParentDashboardService,
   ParentChildStats, ChildSubject, UpcomingExam, WeeklyPerformance, RecSection, FinalExamResult
@@ -20,6 +21,7 @@ Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, L
 export class ParentDashboard implements OnInit, AfterViewInit {
   private parentDashboardService = inject(ParentDashboardService);
   private authService = inject(AuthService);
+  private pdfExport = inject(PdfExportService);
 
   @ViewChild('absencesChart') absencesChartCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('weeklyChart') weeklyChartCanvas!: ElementRef<HTMLCanvasElement>;
@@ -376,6 +378,70 @@ export class ParentDashboard implements OnInit, AfterViewInit {
       const child = this.selectedChild();
       const foundWeek = child?.weeklyPerformances?.find(w => w.weekNumber === weekNum) || null;
       this.selectedWeek.set(foundWeek);
+    }
+  }
+
+  exportingPdf = signal(false);
+
+  async exportPdf() {
+    if (this.exportingPdf()) return;
+    this.exportingPdf.set(true);
+    try {
+      const dashData = this.dashboardData();
+      if (!dashData) return;
+
+      const data: PdfDashboardData = {
+        recentActivities: dashData.recentActivities || [],
+        children: dashData.children.map(child => ({
+          name: child.name,
+          grade: child.grade,
+          class: child.class,
+          performance: child.performance,
+          grades: child.grades,
+          absences: child.absences,
+          attendanceRate: child.attendanceRate,
+          excusedAbsences: child.excusedAbsences,
+          unexcusedAbsences: child.unexcusedAbsences,
+          subjectPerformances: child.subjectPerformances.map(s => ({
+            subjectName: s.subjectName,
+            score: s.score,
+            maxScore: s.maxScore,
+            percentage: s.maxScore > 0 ? (s.score / s.maxScore) * 100 : 0,
+          })),
+          monthlyExams: child.monthlyExams.map(e => ({
+            subjectName: e.subjectName,
+            title: e.title,
+            score: e.score,
+            maxScore: e.maxScore,
+          })),
+          finalExams: child.finalExams.map(e => ({
+            subjectName: e.subjectName,
+            title: e.title,
+            score: e.score,
+            maxScore: e.maxScore,
+          })),
+          weeklyPerformances: child.weeklyPerformances.map(w => ({
+            periodName: w.periodName,
+            weekNumber: w.weekNumber,
+            avgScore: w.avgScore,
+            maxScore: w.maxScore,
+          })),
+          recommendationSections: child.recommendationSections.map(s => ({
+            title: s.title,
+            items: s.items,
+          })),
+          recommendationsText: child.recommendationsText,
+          upcomingExams: child.upcomingExams.map(e => ({
+            title: e.title,
+            subjectName: e.subjectName,
+            startTime: e.startTime,
+          })),
+        })),
+      };
+
+      await this.pdfExport.exportDashboard(data, this.displayUserName);
+    } finally {
+      this.exportingPdf.set(false);
     }
   }
 }

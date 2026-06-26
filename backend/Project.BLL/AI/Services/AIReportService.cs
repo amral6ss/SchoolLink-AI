@@ -40,6 +40,7 @@ public class AIReportService : IAIReportService
 
     /// <summary>
     /// Helper to compute subject grades from evaluations for a given enrollment and period.
+    /// For monthly periods, aggregates across all weekly periods within that month.
     /// </summary>
     private async Task<List<SubjectGradeDto>> ComputeSubjectGradesAsync(
         StudentEnrollment? enrollment, int periodId, CancellationToken ct)
@@ -47,11 +48,74 @@ public class AIReportService : IAIReportService
         var subjectGrades = new List<SubjectGradeDto>();
         if (enrollment == null) return subjectGrades;
 
-        var evaluations = await _unitOfWork.StudentEvaluations
-            .GetByEnrollmentAndPeriodAsync(enrollment.Id, periodId, ct);
+        var period = await _unitOfWork.EvaluationPeriods.GetByIdAsync(periodId);
+        if (period == null) return subjectGrades;
+
+        IReadOnlyList<StudentEvaluation> evaluations;
+
+        // For monthly periods, aggregate evaluations from all weekly periods in that month
+        if (period.PeriodType == PeriodType.Monthly && !string.IsNullOrWhiteSpace(period.MonthName))
+        {
+            var weeklyPeriods = await _unitOfWork.EvaluationPeriods
+                .GetByMonthNameAsync(period.AcademicYearId, period.MonthName, ct);
+
+            var weeklyIds = weeklyPeriods
+                .Where(p => p.PeriodType == PeriodType.Weekly)
+                .Select(p => p.Id)
+                .ToList();
+
+            if (weeklyIds.Count == 0)
+                evaluations = await _unitOfWork.StudentEvaluations
+                    .GetByEnrollmentAndPeriodAsync(enrollment.Id, periodId, ct);
+            else
+            {
+                evaluations = await _unitOfWork.StudentEvaluations
+                    .GetByPeriodsAndEnrollmentsAsync(weeklyIds, [enrollment.Id], ct);
+
+                var weekCount = weeklyIds.Count;
+
+                if (evaluations.Count > 0 && weekCount > 0)
+                {
+                    // Aggregate by subject — sum across weeks then divide to get average
+                    var (groups, _, _) = await AggregateEvaluationsBySubjectAsync(evaluations, ct);
+
+                    subjectGrades = groups.Select(sg => new SubjectGradeDto
+                    {
+                        SubjectName = sg.Name,
+                        Score = Math.Round(sg.Score / weekCount, 1),
+                        MaxScore = Math.Round(sg.Max / weekCount, 1)
+                    }).ToList();
+
+                    return subjectGrades;
+                }
+            }
+        }
+        else
+        {
+            evaluations = await _unitOfWork.StudentEvaluations
+                .GetByEnrollmentAndPeriodAsync(enrollment.Id, periodId, ct);
+        }
 
         if (evaluations.Count == 0) return subjectGrades;
 
+        var (resultGroups, _, _) = await AggregateEvaluationsBySubjectAsync(evaluations, ct);
+
+        subjectGrades = resultGroups.Select(sg => new SubjectGradeDto
+        {
+            SubjectName = sg.Name,
+            Score = sg.Score,
+            MaxScore = sg.Max
+        }).ToList();
+
+        return subjectGrades;
+    }
+
+    /// <summary>
+    /// Aggregates a list of evaluations by subject, returning summed scores and max scores.
+    /// </summary>
+    private async Task<(List<(string Name, decimal Score, decimal Max)> Groups, Dictionary<int, string> SubjectDict, Dictionary<int, decimal> ItemMaxScores)> AggregateEvaluationsBySubjectAsync(
+        IReadOnlyList<StudentEvaluation> evaluations, CancellationToken ct)
+    {
         var itemIds = evaluations.Select(e => e.EvaluationItemId).Distinct().ToList();
         var items = (await _unitOfWork.EvaluationItems.FindAsync(i => itemIds.Contains(i.Id))).ToList();
         var templateIds = items.Select(i => i.TemplateId).Distinct().ToList();
@@ -61,30 +125,28 @@ public class AIReportService : IAIReportService
 
         var subjectDict = subjects.ToDictionary(s => s.Id, s => s.Name);
         var templateDict = templates.ToDictionary(t => t.Id, t => t.SubjectId);
-        var itemDict = items.ToDictionary(i => i.Id, i => new { i.TemplateId, i.MaxScore, i.Name });
+        var itemMaxDict = items.ToDictionary(i => i.Id, i => (decimal)i.MaxScore);
+        var itemTemplateDict = items.ToDictionary(i => i.Id, i => i.TemplateId);
 
-        var subjectGroups = new Dictionary<int, (decimal Score, decimal Max, string Name)>();
+        var groups = new Dictionary<int, (decimal Score, decimal Max, string Name)>();
+
         foreach (var eval in evaluations)
         {
-            if (!itemDict.TryGetValue(eval.EvaluationItemId, out var itemInfo)) continue;
-            if (!templateDict.TryGetValue(itemInfo.TemplateId, out var subjId)) continue;
+            if (!itemTemplateDict.TryGetValue(eval.EvaluationItemId, out var tmplId)) continue;
+            if (!templateDict.TryGetValue(tmplId, out var subjId)) continue;
             if (!subjectDict.TryGetValue(subjId, out var subjName)) continue;
 
             var score = eval.Score ?? 0;
-            if (!subjectGroups.ContainsKey(subjId))
-                subjectGroups[subjId] = (0, 0, subjName);
-            var cur = subjectGroups[subjId];
-            subjectGroups[subjId] = (cur.Score + score, cur.Max + itemInfo.MaxScore, subjName);
+            var maxScore = itemMaxDict.GetValueOrDefault(eval.EvaluationItemId, 0);
+
+            if (!groups.ContainsKey(subjId))
+                groups[subjId] = (0, 0, subjName);
+            var cur = groups[subjId];
+            groups[subjId] = (cur.Score + score, cur.Max + maxScore, subjName);
         }
 
-        subjectGrades = subjectGroups.Select(sg => new SubjectGradeDto
-        {
-            SubjectName = sg.Value.Name,
-            Score = sg.Value.Score,
-            MaxScore = sg.Value.Max
-        }).ToList();
-
-        return subjectGrades;
+        var result = groups.Select(g => (Name: g.Value.Name, Score: g.Value.Score, Max: g.Value.Max)).ToList();
+        return (result, subjectDict, itemMaxDict);
     }
 
     /// <summary>
@@ -352,17 +414,35 @@ public class AIReportService : IAIReportService
                 var allEvals = await _unitOfWork.StudentEvaluations
                     .GetByEnrollmentIdAsync(enrollment.Id, ct);
 
-                // Distinct periods sorted by OrderNum
+                // Distinct periods sorted by OrderNum within the SAME semester
                 var periodOrderMap = allEvals
                     .GroupBy(e => e.PeriodId)
-                    .Select(g => new { PeriodId = g.Key, OrderNum = g.First().Period?.OrderNum ?? 0 })
-                    .OrderBy(p => p.OrderNum)
+                    .Select(g => new {
+                        PeriodId = g.Key,
+                        OrderNum = g.First().Period?.OrderNum ?? 0,
+                        SemesterNumber = g.First().Period?.SemesterNumber,
+                        PeriodType = g.First().Period?.PeriodType
+                    })
                     .ToList();
 
-                var currentIdx = periodOrderMap.FindIndex(p => p.PeriodId == periodId);
+                // Filter to same semester and same period type to avoid mixing
+                // e.g. comparing a monthly period to a weekly period
+                var sameSemester = period.SemesterNumber.HasValue
+                    ? periodOrderMap.Where(p => p.SemesterNumber == period.SemesterNumber).ToList()
+                    : periodOrderMap;
+
+                // Only compare with periods of the same type (monthly vs monthly, etc.)
+                if (period.PeriodType == PeriodType.Monthly)
+                {
+                    sameSemester = sameSemester.Where(p => p.PeriodType == PeriodType.Monthly).ToList();
+                }
+
+                sameSemester = sameSemester.OrderBy(p => p.OrderNum).ToList();
+
+                var currentIdx = sameSemester.FindIndex(p => p.PeriodId == periodId);
                 if (currentIdx > 0)
                 {
-                    var prevMonthId = periodOrderMap[currentIdx - 1].PeriodId;
+                    var prevMonthId = sameSemester[currentIdx - 1].PeriodId;
                     var prevMonth = await _unitOfWork.EvaluationPeriods.GetByIdAsync(prevMonthId);
 
                     if (prevMonth is { IsDeleted: false })
@@ -419,6 +499,9 @@ public class AIReportService : IAIReportService
 
         // Generate AI-enhanced report text with real scores
         var currentYear = DateTime.UtcNow.Year;
+        // Determine the actual month name from the evaluation period's dates
+        var periodMonthName = GetMonthNameFromPeriod(period);
+        var periodDateLabel = $"{periodMonthName} {currentYear} م";
         var scoresSummary = string.Join("\n", subjectGrades.Select(sg => $"- {sg.SubjectName}: {sg.Score:F1}/{sg.MaxScore:F1}"));
 
         // Build rich comparison text for the prompt
@@ -468,7 +551,7 @@ public class AIReportService : IAIReportService
             promptBuilder.AppendLine($"| درجة الشهر السابق ({previousMonthData.PeriodName}) | {previousMonthData.OverallScore:F1}% |");
         if (overallChange != 0)
             promptBuilder.AppendLine($"| التغير عن التقرير السابق | {overallChange:+#;-#;0}% |");
-        promptBuilder.AppendLine($"| التاريخ | يوليو {currentYear} م |");
+        promptBuilder.AppendLine($"| التاريخ | {periodDateLabel} |");
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("---");
         promptBuilder.AppendLine();
@@ -510,7 +593,7 @@ public class AIReportService : IAIReportService
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("---");
         promptBuilder.AppendLine();
-        promptBuilder.AppendLine($"*التاريخ: يوليو {currentYear} م*");
+        promptBuilder.AppendLine($"*التاريخ: {periodDateLabel}*");
         promptBuilder.AppendLine("*المحلل الأكاديمي*");
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("ملاحظات مهمة:");
@@ -814,6 +897,30 @@ public class AIReportService : IAIReportService
         _ => $"الفصل {term}"
     };
 
+    private static readonly string[] ArabicMonthNames =
+        ["يناير", "فبراير", "مارس", "إبريل", "مايو", "يونيو",
+         "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
+    /// <summary>
+    /// Extracts the Arabic month name from an EvaluationPeriod.
+    /// Falls back to period.MonthName, then EndDate, then StartDate, then "يناير".
+    /// </summary>
+    private static string GetMonthNameFromPeriod(EvaluationPeriod period)
+    {
+        if (!string.IsNullOrWhiteSpace(period.MonthName))
+            return period.MonthName;
+
+        var date = period.EndDate ?? period.StartDate;
+        if (date.HasValue)
+        {
+            var idx = date.Value.Month - 1;
+            if (idx >= 0 && idx < ArabicMonthNames.Length)
+                return ArabicMonthNames[idx];
+        }
+
+        return "يناير";
+    }
+
     /// <summary>
     /// Generates a template-based report text when AI generation is unavailable.
     /// </summary>
@@ -983,7 +1090,8 @@ public class AIReportService : IAIReportService
     }
 
     /// <summary>
-    /// Finds the latest evaluation period ID that has data for the given student.
+    /// Finds the current active evaluation period for the student based on today's date.
+    /// Falls back to the most recent completed period, then to the highest period ID.
     /// </summary>
     private async Task<int> ResolveLatestPeriodAsync(int studentId)
     {
@@ -998,7 +1106,25 @@ public class AIReportService : IAIReportService
         var periodIds = evaluations.Select(e => e.PeriodId).Distinct().ToList();
         if (periodIds.Count == 0) return 0;
 
-        // Return the most recent period by ID
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        // 1. Try to find a period whose date range includes today (active period)
+        foreach (var pid in periodIds.OrderByDescending(p => p))
+        {
+            var period = await _unitOfWork.EvaluationPeriods.GetByIdAsync(pid);
+            if (period?.StartDate <= today && period?.EndDate >= today)
+                return pid;
+        }
+
+        // 2. No active period found — pick the most recent completed period (EndDate <= today)
+        foreach (var pid in periodIds.OrderByDescending(p => p))
+        {
+            var period = await _unitOfWork.EvaluationPeriods.GetByIdAsync(pid);
+            if (period?.EndDate <= today)
+                return pid;
+        }
+
+        // 3. Final fallback: highest period ID
         return periodIds.Max();
     }
 }

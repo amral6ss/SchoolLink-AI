@@ -27,10 +27,35 @@ export interface AssignmentProgress {
 export interface ExamProgress {
   id: number;
   subject: string;
+  title: string;
   date?: string;
   status: string;
   score?: number;
   maxScore: number;
+}
+
+export interface ChildExamAttemptResult {
+  examId: number;
+  subject: string;
+  title: string;
+  studentId: number;
+  studentName: string;
+  score?: number;
+  maxScore: number;
+  status: string;
+  message: string;
+  answers: ChildExamAnswer[];
+}
+
+export interface ChildExamAnswer {
+  questionId: number;
+  questionText: string;
+  answerText?: string;
+  correctAnswerText?: string;
+  isCorrect?: boolean;
+  pointsEarned: number;
+  questionPoints: number;
+  aIFeedback?: string;
 }
 
 interface OperationResult<T> {
@@ -49,6 +74,12 @@ export class ChildProgressService {
       url += `?term=${term}`;
     }
     return this.http.get<OperationResult<ChildProgressItem[]>>(url).pipe(
+      map(res => res.data)
+    );
+  }
+
+  getExamAttempt(examId: number) {
+    return this.http.get<OperationResult<ChildExamAttemptResult>>(`${this.base}/exam-attempt/${examId}`).pipe(
       map(res => res.data)
     );
   }

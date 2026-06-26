@@ -46,7 +46,7 @@
                 <span class="material-symbols-outlined">layers</span>
                 {{ gradeLevels().length }} مرحلة / صف
               </span>
-              <span class="meta-role-badge">{{ activeTab() === 'academic' ? 'الأكاديمية' : activeTab() === 'permissions' ? 'الصلاحيات' : 'النتائج' }}</span>
+              <span class="meta-role-badge">{{ activeTab() === 'academic' ? 'الأكاديمية' : activeTab() === 'permissions' ? 'الصلاحيات' : activeTab() === 'school' ? 'المدرسة' : 'النتائج' }}</span>
             </div>
           </div>
         </div>
@@ -79,6 +79,20 @@
           <span class="settings-tab-copy">
             <span class="settings-tab-title">الصلاحيات</span>
             <span class="settings-tab-sub">أدوار المستخدمين والوصول</span>
+          </span>
+        </button>
+
+        <button type="button"
+                role="tab"
+                (click)="activeTab.set('school')"
+                [class.is-active]="activeTab() === 'school'"
+                class="settings-tab-btn">
+          <span class="settings-tab-icon">
+            <span class="material-symbols-outlined">domain</span>
+          </span>
+          <span class="settings-tab-copy">
+            <span class="settings-tab-title">الملف التعريفي</span>
+            <span class="settings-tab-sub">بيانات المدرسة والإدارة</span>
           </span>
         </button>
 
@@ -293,6 +307,123 @@
           </div>
         </section>
 
+      </ng-container>
+
+      <!-- ═════════════ SCHOOL PROFILE TAB ═════════════ -->
+      <ng-container *ngIf="activeTab() === 'school'">
+
+        <section class="profile-panel anim-card" style="--card-delay:0.05s">
+          <div class="panel-title">
+            <div class="panel-icon-wrap panel-icon-indigo">
+              <span class="material-symbols-outlined">domain</span>
+            </div>
+            <div>
+              <p class="panel-eyebrow">الملف التعريفي للمدرسة</p>
+              <h2>بيانات المدرسة والإدارة التعليمية</h2>
+            </div>
+          </div>
+          <p class="panel-desc">قم بإدخال بيانات المدرسة لتظهر لأولياء الأمور والزائرين في صفحة الموقع الرئيسية.</p>
+
+          <!-- Error -->
+          <div *ngIf="schoolError()" class="profile-alert profile-alert-error">
+            <div class="alert-icon"><span class="material-symbols-outlined">error</span></div>
+            <span>{{ schoolError() }}</span>
+            <button (click)="schoolError.set(null)" class="alert-close" type="button">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <!-- Success -->
+          <div *ngIf="schoolSuccess()" class="profile-alert profile-alert-success">
+            <div class="alert-icon"><span class="material-symbols-outlined">check_circle</span></div>
+            <span>{{ schoolSuccess() }}</span>
+          </div>
+
+          <div class="settings-form-panel">
+            <div class="settings-form-grid">
+              <div class="form-field span-full">
+                <label>
+                  <span class="field-label">اسم المدرسة *</span>
+                  <div class="input-wrap">
+                    <span class="input-icon material-symbols-outlined">school</span>
+                    <input type="text" [(ngModel)]="schoolForm.schoolName" placeholder="مثال: مدرسة النصر الابتدائية" />
+                  </div>
+                </label>
+              </div>
+              <div class="form-field">
+                <label>
+                  <span class="field-label">المحافظة *</span>
+                  <div class="input-wrap">
+                    <span class="input-icon material-symbols-outlined">map</span>
+                    <input type="text" [(ngModel)]="schoolForm.governorate" placeholder="مثال: الجيزة" />
+                  </div>
+                </label>
+              </div>
+              <div class="form-field">
+                <label>
+                  <span class="field-label">المديرية التعليمية *</span>
+                  <div class="input-wrap">
+                    <span class="input-icon material-symbols-outlined">account_balance</span>
+                    <input type="text" [(ngModel)]="schoolForm.directorate" placeholder="مثال: مديرية التربية والتعليم بالجيزة" />
+                  </div>
+                </label>
+              </div>
+              <div class="form-field">
+                <label>
+                  <span class="field-label">الإدارة التعليمية *</span>
+                  <div class="input-wrap">
+                    <span class="input-icon material-symbols-outlined">layers</span>
+                    <input type="text" [(ngModel)]="schoolForm.educationalAdministration" placeholder="مثال: إدارة جنوب القاهرة" />
+                  </div>
+                </label>
+              </div>
+              <div class="form-field">
+                <label>
+                  <span class="field-label">رقم الهاتف</span>
+                  <div class="input-wrap">
+                    <span class="input-icon material-symbols-outlined">phone</span>
+                    <input type="text" [(ngModel)]="schoolForm.phone" placeholder="مثال: 01234567890 (بدون شرطات)" />
+                  </div>
+                </label>
+              </div>
+              <div class="form-field">
+                <label>
+                  <span class="field-label">البريد الإلكتروني</span>
+                  <div class="input-wrap">
+                    <span class="input-icon material-symbols-outlined">email</span>
+                    <input type="email" [(ngModel)]="schoolForm.email" placeholder="email@school.com" />
+                  </div>
+                </label>
+              </div>
+              <div class="form-field span-full">
+                <label>
+                  <span class="field-label">العنوان</span>
+                  <div class="input-wrap">
+                    <span class="input-icon material-symbols-outlined">location_on</span>
+                    <input type="text" [(ngModel)]="schoolForm.address" placeholder="عنوان المدرسة" />
+                  </div>
+                </label>
+              </div>
+              <div class="form-field">
+                <label>
+                  <span class="field-label">مدير المدرسة</span>
+                  <div class="input-wrap">
+                    <span class="input-icon material-symbols-outlined">badge</span>
+                    <input type="text" [(ngModel)]="schoolForm.managerName" placeholder="اسم المدير" />
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-action-row">
+              <button (click)="saveSchoolProfile()" [disabled]="schoolLoading()" class="profile-primary" type="button">
+                <span class="btn-shimmer"></span>
+                <span class="material-symbols-outlined">save</span>
+                {{ schoolLoading() ? 'جاري الحفظ...' : 'حفظ البيانات' }}
+              </button>
+            </div>
+          </div>
+        </section>
       </ng-container>
 
       <!-- ═════════════ ACADEMIC TAB ═════════════ -->

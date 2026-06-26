@@ -25,4 +25,12 @@ public class ChildProgressController : ControllerBase
         var result = await _service.GetChildProgressAsync(parentId, term);
         return Ok(result);
     }
+
+    [HttpGet("exam-attempt/{examId}")]
+    public async Task<IActionResult> GetExamAttempt(int examId)
+    {
+        var parentId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await _service.GetExamAttemptResultAsync(parentId, examId);
+        return Ok(result);
+    }
 }
