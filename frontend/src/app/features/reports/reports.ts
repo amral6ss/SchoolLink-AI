@@ -6,6 +6,7 @@ import { Sidebar } from '../../layouts/sidebar/sidebar';
 import { AuthService } from '../../core/services/auth.service';
 import { buildApiUrl } from '../../core/utils/api-url';
 import { ParentDashboardService, ParentDashboardChild } from '../../core/services/parent-dashboard.service';
+import { PdfExportService, PdfStudentReportData } from '../../core/services/pdf-export.service';
 import { map } from 'rxjs';
 
 // ---- DTO Interfaces matching backend ----
@@ -103,6 +104,7 @@ export class Reports implements OnInit {
   private authService = inject(AuthService);
   private http = inject(HttpClient);
   private parentDashboardService = inject(ParentDashboardService);
+  private pdfExport = inject(PdfExportService);
 
   sidebarOpen = signal(false);
   loading = signal(false);
@@ -591,5 +593,69 @@ export class Reports implements OnInit {
 
   closeCircleInfo() {
     this.circleInfo.set(null);
+  }
+
+  /** Export the current report as a PDF */
+  exportingPdf = signal(false);
+
+  async exportPdf() {
+    if (this.exportingPdf()) return;
+    this.exportingPdf.set(true);
+    try {
+      const report = this.reportData();
+      if (!report) return;
+
+      const data: PdfStudentReportData = {
+        studentName: report.studentName || this.selectedChildName(),
+        childName: this.selectedChildName(),
+        periodName: report.periodName,
+        term: report.term,
+        overallScore: report.overallScore,
+        overallMax: report.overallMax,
+        finalGradeAverage: report.finalGradeAverage,
+        finalGradeMax: report.finalGradeMax,
+        overallTrend: report.overallTrend,
+        overallChange: report.overallChange,
+        subjectGrades: report.subjectGrades.map(s => ({
+          subjectName: s.subjectName,
+          score: s.score,
+          maxScore: s.maxScore,
+          percentage: s.percentage,
+        })),
+        metrics: report.metrics.map(m => ({
+          label: m.label,
+          value: m.value,
+          max: m.max,
+          trend: m.trend,
+        })),
+        reportText: report.reportText,
+        recommendationsText: this.recommendationsText(),
+        recSections: this.recSections(),
+        recItems: this.recommendationItems(),
+        previousMonth: report.previousMonth
+          ? {
+              periodName: report.previousMonth.periodName,
+              overallScore: report.previousMonth.overallScore,
+              overallMax: report.previousMonth.overallMax,
+              subjectGrades: report.previousMonth.subjectGrades.map(s => ({
+                subjectName: s.subjectName,
+                score: s.score,
+                maxScore: s.maxScore,
+                percentage: s.percentage,
+              })),
+              metrics: report.previousMonth.metrics.map(m => ({
+                label: m.label,
+                value: m.value,
+                max: m.max,
+                trend: m.trend,
+              })),
+            }
+          : null,
+      };
+
+      await this.pdfExport.exportStudentReport(data);
+    } finally {
+      this.exportingPdf.set(false);
+    }
   }
 }

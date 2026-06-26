@@ -124,6 +124,23 @@
 }
 .btn-secondary:hover { background: #f0f2ff; border-color: #00236f; transform: translateY(-1px); }
 .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.btn-export {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1.5px solid #dc262630;
+  background: #fff;
+  color: #dc2626;
+  font-family: inherit;
+}
+.btn-export:hover { background: #fef2f2; border-color: #dc2626; transform: translateY(-1px); }
+.btn-export:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
 .spinner-sm {
   width: 16px;

@@ -10,19 +10,31 @@
             <p class="text-label-sm text-primary font-bold mb-1">لوحة ولي الأمر</p>
             <h1 class="font-headline-lg font-bold">بيانات الأبناء</h1>
           </div>
-          <div class="grid grid-cols-3 gap-3 min-w-full md:min-w-[360px]">
-            <div class="stat-box">
-              <p class="text-label-sm text-outline mb-1">الإجمالي</p>
-              <p class="stat-number text-primary">{{ totalChildren() }}</p>
+          <div class="flex items-center gap-3">
+            <div class="grid grid-cols-3 gap-3 min-w-full md:min-w-[360px]">
+              <div class="stat-box">
+                <p class="text-label-sm text-outline mb-1">الإجمالي</p>
+                <p class="stat-number text-primary">{{ totalChildren() }}</p>
+              </div>
+              <div class="stat-box">
+                <p class="text-label-sm text-outline mb-1">النشطون</p>
+                <p class="stat-number text-green-600">{{ activeChildren() }}</p>
+              </div>
+              <div class="stat-box">
+                <p class="text-label-sm text-outline mb-1">غير النشطين</p>
+                <p class="stat-number text-amber-600">{{ inactiveChildren() }}</p>
+              </div>
             </div>
-            <div class="stat-box">
-              <p class="text-label-sm text-outline mb-1">النشطون</p>
-              <p class="stat-number text-green-600">{{ activeChildren() }}</p>
-            </div>
-            <div class="stat-box">
-              <p class="text-label-sm text-outline mb-1">غير النشطين</p>
-              <p class="stat-number text-amber-600">{{ inactiveChildren() }}</p>
-            </div>
+            @if (dashboardData()?.children?.length) {
+              <button class="btn-export-dash" (click)="exportPdf()" [disabled]="exportingPdf()">
+                @if (exportingPdf()) {
+                  <span class="spinner-sm"></span>
+                } @else {
+                  <span class="material-symbols-outlined">picture_as_pdf</span>
+                }
+                <span>تصدير PDF</span>
+              </button>
+            }
           </div>
         </div>
       </section>

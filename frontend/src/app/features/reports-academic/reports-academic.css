@@ -118,6 +118,23 @@
   transition: opacity 0.2s;
 }
 .btn-view:hover { opacity: 0.9; }
+.btn-export {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.5rem;
+  background: #fff;
+  color: #dc2626;
+  border: 1.5px solid #dc262650;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-export:hover { background: #fef2f2; border-color: #dc2626; }
+.btn-export:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ─── Loading ────────────────────────────────── */
 .loading-state {
@@ -140,6 +157,17 @@
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Small spinner for button loading state */
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #dc262630;
+  border-top-color: #dc2626;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
 
 /* ─── Empty State ────────────────────────────── */
 .empty-state {

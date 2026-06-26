@@ -57,6 +57,17 @@
             <span>توصيات ذكية</span>
           }
         </button>
+        @if (reportData()) {
+          <button class="btn-export" (click)="exportPdf()" [disabled]="exportingPdf()">
+            @if (exportingPdf()) {
+              <span class="spinner-sm"></span>
+              <span>جاري التصدير...</span>
+            } @else {
+              <span class="material-symbols-outlined">picture_as_pdf</span>
+              <span>تصدير PDF</span>
+            }
+          </button>
+        }
       </div>
 
       @if (error()) {

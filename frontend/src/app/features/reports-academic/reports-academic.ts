@@ -14,6 +14,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Sidebar } from '../../layouts/sidebar/sidebar';
 import { HttpClient } from '@angular/common/http';
 import { buildApiUrl } from '../../core/utils/api-url';
+import { PdfExportService, PdfAcademicReportData, PdfAcademicMonthGroup } from '../../core/services/pdf-export.service';
 import { Chart, registerables } from 'chart.js';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -103,6 +104,7 @@ export class ReportsAcademic implements AfterViewInit, OnDestroy, OnInit {
   private http = inject(HttpClient);
   private route = inject(ActivatedRoute);
   private base = buildApiUrl();
+  private pdfExport = inject(PdfExportService);
 
   sidebarOpen = signal(false);
   chart1: Chart | null = null;
@@ -491,6 +493,38 @@ export class ReportsAcademic implements AfterViewInit, OnDestroy, OnInit {
   onTermChange() { this.loadReport(); }
   onSubjectChange() { this.loadReport(); }
   onGradeLevelChange() { this.loadReport(); }
+
+  exportingPdf = signal(false);
+
+  async exportPdf() {
+    if (this.exportingPdf() || this.studentRows.length === 0) return;
+    this.exportingPdf.set(true);
+    try {
+      const monthGroups: PdfAcademicMonthGroup[] = this.monthGroups.map(mg => ({
+        monthName: mg.monthName,
+        periodIds: mg.periods.map(p => p.id),
+      }));
+
+      // Calculate total student count
+      const classData: PdfAcademicReportData = {
+        className: this.selectedClassName,
+        termLabel: this.termLabel,
+        subjectName: this.subjects.find(s => s.id === this.selectedSubjectId)?.name || '',
+        avgPercent: this.avgPercent,
+        avgAssessment1: this.avgAssessment1,
+        avgAssessment2: this.avgAssessment2,
+        avgFinal: this.avgFinal,
+        students: this.studentRows,
+        monthlyExams: this.monthlyExamData,
+        monthGroups,
+        studentCount: this.studentRows.length,
+      };
+
+      await this.pdfExport.exportAcademicReport(classData);
+    } finally {
+      this.exportingPdf.set(false);
+    }
+  }
 
   getGradeBadge(pct: number): { label: string; cls: string } {
     if (pct >= 90) return { label: 'ممتاز', cls: 'badge-excellent' };
