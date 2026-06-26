@@ -14,6 +14,8 @@ export interface Student {
   userName?: string | null;
   userEmail?: string | null;
   isActive: boolean;
+  lifecycleStatus?: number;
+  lifecycleStatusName?: string;
   createdAt?: string;
 }
 

@@ -57,6 +57,53 @@
         </div>
       </div>
 
+      <section class="annual-decision-panel anim-card" style="--card-delay:0.03s">
+        <div class="annual-decision-head">
+          <div>
+            <p class="panel-eyebrow">Annual decision</p>
+            <h2>قرارات نهاية السنة</h2>
+          </div>
+          <button type="button"
+                  class="smart-btn smart-btn-primary"
+                  (click)="loadCandidates()"
+                  [disabled]="isLoadingCandidates() || isBootstrapping()">
+            <span class="material-symbols-outlined">{{ isLoadingCandidates() ? 'progress_activity' : 'refresh' }}</span>
+            تحديث القرارات
+          </button>
+        </div>
+
+        <div class="annual-decision-grid">
+          <div class="annual-card annual-card-promote">
+            <span class="material-symbols-outlined">trending_up</span>
+            <div>
+              <strong>{{ annualDecisionCounts().promote }}</strong>
+              <small>جاهز للترقية</small>
+            </div>
+          </div>
+          <div class="annual-card annual-card-graduate">
+            <span class="material-symbols-outlined">school</span>
+            <div>
+              <strong>{{ annualDecisionCounts().graduate }}</strong>
+              <small>جاهز للتخرج</small>
+            </div>
+          </div>
+          <div class="annual-card annual-card-retain">
+            <span class="material-symbols-outlined">pause_circle</span>
+            <div>
+              <strong>{{ annualDecisionCounts().retain }}</strong>
+              <small>إبقاء في نفس الصف</small>
+            </div>
+          </div>
+          <div class="annual-card annual-card-pending">
+            <span class="material-symbols-outlined">pending_actions</span>
+            <div>
+              <strong>{{ annualDecisionCounts().pending }}</strong>
+              <small>بانتظار اكتمال النتيجة</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ─── Layout Grid ──────────────────────────────────────── -->
       <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 layout-grid">
 
@@ -118,15 +165,10 @@
           </div>
 
           <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="field-label">أساس القرار (الترم)</label>
-              <select class="field-select"
-                      [ngModel]="termScope()"
-                      (ngModelChange)="onTermScopeChange($event)">
-                <option [ngValue]="3">الترمين (نهاية العام)</option>
-                <option [ngValue]="1">الترم الأول فقط</option>
-                <option [ngValue]="2">الترم الثاني فقط</option>
-              </select>
+            <div class="annual-basis-box">
+              <span class="annual-basis-label">قرار نهاية السنة</span>
+              <strong>الترم الأول + الترم الثاني</strong>
+              <small>لا يتم تنفيذ الترقية من ترم واحد فقط.</small>
             </div>
 
             <div>
@@ -141,7 +183,7 @@
             <span class="material-symbols-outlined">menu_book</span>
             <span>
               قاعدة التقييم: الطالب <strong>ناجح</strong> إذا نجح في
-              <strong>كل مادة</strong> (درجة المادة ≥ {{ threshold() }}%) ضمن {{ getScopeLabel(termScope()) }}.
+              <strong>كل مادة</strong> (درجة المادة السنوية ≥ {{ threshold() }}%) بعد جمع الترم الأول والثاني.
             </span>
           </div>
 
@@ -207,6 +249,11 @@
             <span>{{ hasTargetConfigurationIssue() }}</span>
           </div>
 
+          <div *ngIf="selectedStatusIssue()" class="notice notice-warn">
+            <span class="material-symbols-outlined">rule</span>
+            <span>{{ selectedStatusIssue() }}</span>
+          </div>
+
           <div *ngIf="action() !== 3" class="space-y-4">
             <div>
               <label class="field-label">السنة الدراسية الهدف</label>
@@ -218,16 +265,49 @@
               </select>
             </div>
 
-            <div>
-              <label class="field-label">الفصل الهدف</label>
-              <select class="field-select"
-                      [ngModel]="selectedTargetClassId()"
-                      (ngModelChange)="selectedTargetClassId.set($event)">
-                <option [ngValue]="null">-- اختر الفصل الهدف --</option>
-                <option *ngFor="let cls of availableTargetClasses()" [ngValue]="cls.id">
-                  {{ cls.name }} - {{ cls.gradeLevelName || cls.gradeLevelId }}
-                </option>
-              </select>
+            <div class="class-mapping-panel">
+              <div class="class-mapping-head">
+                <div>
+                  <label class="field-label">توزيع الفصول الهدف</label>
+                  <p>اربط كل فصل مصدر بفصل هدف داخل السنة المختارة. التوزيع التلقائي يحاول مطابقة نفس الشعبة.</p>
+                </div>
+                <button type="button"
+                        class="smart-btn smart-btn-primary"
+                        [disabled]="!selectedTargetAcademicYearId() || availableTargetClasses().length === 0"
+                        (click)="autoMapTargetClasses()">
+                  <span class="material-symbols-outlined">auto_awesome</span>
+                  توزيع تلقائي
+                </button>
+              </div>
+
+              <div *ngIf="classMappingIssue()" class="notice notice-warn">
+                <span class="material-symbols-outlined">account_tree</span>
+                <span>{{ classMappingIssue() }}</span>
+              </div>
+
+              <div *ngIf="selectedTargetAcademicYearId() && availableTargetClasses().length > 0" class="class-mapping-list">
+                <div *ngFor="let source of sourceClassesForMapping()" class="class-mapping-row">
+                  <div class="source-class-box">
+                    <span class="source-class-name">{{ source.name }}</span>
+                    <small>{{ source.count }} طالب</small>
+                  </div>
+
+                  <span class="material-symbols-outlined mapping-arrow">arrow_back</span>
+
+                  <select class="field-select"
+                          [ngModel]="classMappings()[source.id]"
+                          (ngModelChange)="setClassMapping(source.id, $event)">
+                    <option [ngValue]="null">-- اختر الفصل الهدف --</option>
+                    <option *ngFor="let cls of availableTargetClasses()" [ngValue]="cls.id">
+                      {{ getClassOptionLabel(cls) }} - {{ cls.gradeLevelName || cls.gradeLevelId }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              <div *ngIf="selectedTargetAcademicYearId() && availableTargetClasses().length === 0" class="mapping-empty">
+                لا توجد فصول نشطة مناسبة في السنة والصف الهدف.
+              </div>
             </div>
 
             <div class="notice notice-neutral">
@@ -239,9 +319,17 @@
             </div>
           </div>
 
-          <div *ngIf="action() === 3" class="notice notice-danger">
-            <span class="material-symbols-outlined">warning</span>
-            <span>سيتم إغلاق القيد الحالي وتعطيل الطالب، وقد تُعطَّل حسابات أولياء الأمور إذا لم يعد لديهم أبناء نشطون.</span>
+          <div class="action-guidance" [class.action-guidance-retain]="action() === 2" [class.action-guidance-graduate]="action() === 3">
+            <span class="material-symbols-outlined">{{ action() === 1 ? 'trending_up' : action() === 2 ? 'pause_circle' : 'school' }}</span>
+            <div>
+              <strong>{{ getActionGuidanceTitle() }}</strong>
+              <p>{{ getActionGuidanceText() }}</p>
+              <div class="selected-health" *ngIf="selectedCount()">
+                <span>{{ selectedDecisionCounts().eligible }} مناسب للعملية</span>
+                <span>{{ selectedDecisionCounts().blocked }} غير مناسب</span>
+                <span>{{ selectedDecisionCounts().pending }} بانتظار درجات</span>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -269,8 +357,8 @@
               <strong>{{ selectedCount() }}</strong>
             </div>
             <div class="summary-row">
-              <span>حسابات الطلاب المتأثرة</span>
-              <strong>{{ action() === 3 ? selectedStudentsWithAccountsCount() : 0 }}</strong>
+              <span>حالة الحسابات بعد التخرج</span>
+              <strong>تبقى فعالة</strong>
             </div>
           </div>
 
@@ -281,7 +369,7 @@
             <span class="material-symbols-outlined" [class.spinning]="isExecuting()">
               {{ isExecuting() ? 'progress_activity' : 'play_circle' }}
             </span>
-            <span>{{ isExecuting() ? 'جارٍ تنفيذ العملية...' : 'تنفيذ العملية' }}</span>
+            <span>{{ getExecuteButtonLabel() }}</span>
           </button>
         </section>
 
@@ -386,20 +474,23 @@
                 تحديد ذكي حسب الحالة الأكاديمية
               </p>
               <div class="flex flex-wrap items-end gap-2">
-                <button type="button" (click)="selectVisibleByStatus(2)" class="smart-btn smart-btn-success">
+                <button type="button" (click)="selectVisibleByStatus('Passed')" class="smart-btn smart-btn-success">
                   تحديد الناجحين (ترقية)
                 </button>
-                <button type="button" (click)="selectVisibleByStatus(3)" class="smart-btn smart-btn-warn">
+                <button type="button" (click)="selectVisibleByStatus('Failed')" class="smart-btn smart-btn-warn">
                   تحديد الراسبين (إبقاء)
                 </button>
-                <button type="button" (click)="selectVisibleByStatus(1)" class="smart-btn smart-btn-neutral">
+                <button type="button" (click)="selectVisibleByStatus('Unpublished')" class="smart-btn smart-btn-neutral">
                   تحديد غير المنشورة
                 </button>
-                <button type="button" (click)="selectVisibleByStatus(0)" class="smart-btn smart-btn-neutral">
+                <button type="button" (click)="selectVisibleByStatus('NoGrades')" class="smart-btn smart-btn-neutral">
                   تحديد بدون درجات
                 </button>
                 <button type="button" (click)="autoDecideSelection()" class="smart-btn smart-btn-primary">
                   تصنيف تلقائي (ناجح + راسب)
+                </button>
+                <button type="button" (click)="selectRecommendedForCurrentAction()" class="smart-btn smart-btn-primary">
+                  تحديد المناسب للعملية الحالية
                 </button>
                 <button type="button" (click)="toggleAllVisibleCandidates(true)" class="smart-btn smart-btn-success">
                   تحديد الكل
@@ -446,6 +537,8 @@
                     </th>
                     <th>الطالب</th>
                     <th>الفصل الحالي</th>
+                    <th>القرار السنوي</th>
+                    <th>حالة الطالب</th>
                     <th>الحساب</th>
                     <th>الحالة الأكاديمية</th>
                     <th class="text-center" style="width:120px">تفاصيل</th>
@@ -468,6 +561,19 @@
                         <span class="tag tag-neutral">{{ candidate.currentClassName }}</span>
                       </td>
                       <td>
+                        <span [class]="getAnnualDecisionClass(candidate)">
+                          {{ getAnnualDecisionLabel(candidate) }}
+                        </span>
+                      </td>
+                      <td>
+                        <span class="tag tag-success" *ngIf="candidate.studentLifecycleStatus === 1">
+                          {{ getLifecycleStatusLabel(candidate) }}
+                        </span>
+                        <span class="tag tag-mute" *ngIf="candidate.studentLifecycleStatus !== 1">
+                          {{ getLifecycleStatusLabel(candidate) }}
+                        </span>
+                      </td>
+                      <td>
                         <span class="tag"
                               [class.tag-success]="candidate.hasStudentAccount"
                               [class.tag-mute]="!candidate.hasStudentAccount">
@@ -478,9 +584,15 @@
                         <span class="tag" [ngClass]="getStatusBadgeClass(candidate.academicStatus)">
                           {{ getStatusLabel(candidate.academicStatus) }}
                         </span>
-                        <div class="student-meta" *ngIf="candidate.academicStatus === 2 || candidate.academicStatus === 3">
+                        <div class="student-meta" *ngIf="candidate.academicStatus === 'Passed' || candidate.academicStatus === 'Failed'">
                           {{ candidate.passedSubjectsCount }} ناجحة / {{ candidate.failedSubjectsCount }} راسبة
                           · {{ candidate.finalTotal }}%
+                        </div>
+                        <div class="student-meta failed-subjects" *ngIf="candidate.academicStatus === 'Failed'">
+                          راسب في: {{ getFailedSubjectNames(candidate) }}
+                        </div>
+                        <div class="student-meta pending-reason" *ngIf="candidate.academicStatus === 'NoGrades' || candidate.academicStatus === 'Unpublished'">
+                          {{ getPendingReason(candidate) }}
                         </div>
                       </td>
                       <td class="text-center">
@@ -500,12 +612,13 @@
                     <!-- Expandable subject-breakdown row -->
                     <tr *ngIf="isSubjectDetailsOpen(candidate.enrollmentId) && candidate.subjectGrades.length"
                         class="subjects-row">
-                      <td colspan="6">
+                      <td colspan="8">
                         <div class="subjects-grid">
                           <div *ngFor="let sg of candidate.subjectGrades"
                                class="subject-chip"
                                [class.subject-passed]="sg.isPassed"
-                               [class.subject-failed]="!sg.isPassed">
+                               [class.subject-failed]="sg.isPublished && !sg.isPassed"
+                               [class.subject-pending]="!sg.isPublished">
                             <div class="subject-chip-head">
                               <span class="subject-chip-name">{{ sg.subjectName }}</span>
                               <span class="subject-chip-term">{{ getTermLabel(sg.term) }}</span>
@@ -513,7 +626,7 @@
                             <div class="subject-chip-score">
                               <strong>{{ sg.percentage }}%</strong>
                               <span class="subject-chip-badge">
-                                {{ sg.isPassed ? 'ناجح' : 'راسب' }}
+                                {{ !sg.isPublished ? 'غير مكتمل' : (sg.isPassed ? 'ناجح' : 'راسب') }}
                               </span>
                             </div>
                           </div>
@@ -523,7 +636,7 @@
                   </ng-container>
 
                   <tr *ngIf="!filteredCandidates().length">
-                    <td colspan="6" class="empty-state">
+                    <td colspan="8" class="empty-state">
                       <span class="material-symbols-outlined">school</span>
                       <p class="student-name mb-1" style="font-size:16px">لا توجد نتائج معروضة</p>
                       <p class="panel-subtitle">حمّل المرشحين أولاً أو غيّر الفلاتر الحالية.</p>
@@ -622,27 +735,9 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4"
-                 *ngIf="lastResult()!.deactivatedStudents.length || lastResult()!.deactivatedParents.length">
-              <div class="info-box">
-                <h4 class="info-box-value mb-3">الطلاب الذين تم تعطيلهم</h4>
-                <div *ngIf="lastResult()!.deactivatedStudents.length; else noStudents" class="flex flex-wrap gap-2">
-                  <span *ngFor="let name of lastResult()!.deactivatedStudents" class="chip-success">{{ name }}</span>
-                </div>
-                <ng-template #noStudents>
-                  <p class="panel-subtitle" style="margin:0">لا يوجد طلاب تم تعطيلهم في آخر تنفيذ.</p>
-                </ng-template>
-              </div>
-
-              <div class="info-box">
-                <h4 class="info-box-value mb-3">أولياء الأمور الذين تم تعطيلهم</h4>
-                <div *ngIf="lastResult()!.deactivatedParents.length; else noParents" class="flex flex-wrap gap-2">
-                  <span *ngFor="let name of lastResult()!.deactivatedParents" class="chip-info">{{ name }}</span>
-                </div>
-                <ng-template #noParents>
-                  <p class="panel-subtitle" style="margin:0">لا يوجد أولياء أمور تم تعطيلهم في آخر تنفيذ.</p>
-                </ng-template>
-              </div>
+            <div class="notice notice-neutral" *ngIf="lastResult()!.graduatedCount > 0">
+              <span class="material-symbols-outlined">verified</span>
+              <span>تم تحويل الطلاب المتخرجين إلى حالة Graduated فقط. لم يتم تعطيل حساب الطالب أو ولي الأمر.</span>
             </div>
           </section>
         </section>

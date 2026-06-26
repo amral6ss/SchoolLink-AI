@@ -32,6 +32,9 @@ public class ClassSubjectTeacherService : IClassSubjectTeacherService
         if (schoolClass is null || schoolClass.IsDeleted)
             return OperationResult<ClassSubjectTeacherDto>.Failure("الفصل غير موجود");
 
+        if (schoolClass.Status != ClassStatus.Active)
+            return OperationResult<ClassSubjectTeacherDto>.Failure("لا يمكن تعيين مدرس لفصل غير نشط");
+
         // 2. Validate Subject
         var subject = await _unitOfWork.Subjects.GetByIdAsync(request.SubjectId);
         if (subject is null || subject.IsDeleted)
@@ -215,6 +218,9 @@ public class ClassSubjectTeacherService : IClassSubjectTeacherService
             var schoolClass = await _unitOfWork.Classes.GetByIdAsync(req.ClassId);
             if (schoolClass is null || schoolClass.IsDeleted)
                 return OperationResult.Failure($"الفصل {req.ClassId} غير موجود");
+
+            if (schoolClass.Status != ClassStatus.Active)
+                return OperationResult.Failure($"الفصل {req.ClassId} غير نشط");
 
             var subject = await _unitOfWork.Subjects.GetByIdAsync(req.SubjectId);
             if (subject is null || subject.IsDeleted)

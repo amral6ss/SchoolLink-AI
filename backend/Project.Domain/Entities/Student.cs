@@ -10,6 +10,7 @@ namespace Project.Domain.Entities
         public DateOnly? BirthDate { get; set; }
         public int? UserId { get; set; }
         public bool IsActive { get; set; } = true;
+        public StudentLifecycleStatus LifecycleStatus { get; set; } = StudentLifecycleStatus.Active;
 
         // Navigation Properties
         public User? User { get; set; }

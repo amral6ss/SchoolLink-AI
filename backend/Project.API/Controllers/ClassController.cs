@@ -179,6 +179,26 @@ public class ClassController : ControllerBase
     }
 
     [Authorize(Roles = "Admin")]
+    [HttpPost("copy-from-year/preview")]
+    public async Task<IActionResult> PreviewCopyFromYear([FromBody] CopyClassesFromYearRequest request)
+    {
+        var result = await _classService.PreviewCopyClassesFromYearAsync(request);
+        if (!result.IsSuccess)
+            return BadRequest(result);
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost("copy-from-year")]
+    public async Task<IActionResult> CopyFromYear([FromBody] CopyClassesFromYearRequest request)
+    {
+        var result = await _classService.CopyClassesFromYearAsync(request);
+        if (!result.IsSuccess)
+            return BadRequest(result);
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateClassRequest request)
     {

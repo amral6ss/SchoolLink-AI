@@ -1090,7 +1090,7 @@ export class Chat implements OnInit, OnDestroy {
       const data = res.data ?? res;
       this.academicYearList.set(Array.isArray(data) ? data : []);
     });
-    this.classService.getAll().subscribe(res => {
+    this.classService.getAll({ status: 1 }).subscribe(res => {
       const data = res.data ?? res;
       if (Array.isArray(data)) this.classList.set(data);
       else if (data?.items) this.classList.set(data.items);

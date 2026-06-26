@@ -43,7 +43,9 @@ public class ClassService : IClassService
         {
             GradeLevelId   = request.GradeLevelId,
             AcademicYearId = request.AcademicYearId,
-            Name           = request.Name
+            Name           = request.Name.Trim(),
+            Capacity       = request.Capacity,
+            Status         = request.Status
         };
 
         // 5. Persist
@@ -67,13 +69,16 @@ public class ClassService : IClassService
             return OperationResult<ClassDto>.Failure("الفصل غير موجود");
 
         // 2. Name uniqueness within same (GradeLevelId, AcademicYearId)
-        if (request.Name != entity.Name &&
+        var normalizedName = request.Name.Trim();
+        if (!string.Equals(normalizedName, entity.Name, StringComparison.Ordinal) &&
             await _unitOfWork.Classes.ExistsByNameGradeLevelAndYearAsync(
-                request.Name, entity.GradeLevelId, entity.AcademicYearId))
+                normalizedName, entity.GradeLevelId, entity.AcademicYearId))
             return OperationResult<ClassDto>.Failure("اسم الفصل مستخدم بالفعل");
 
         // 3. Apply update
-        entity.Name      = request.Name;
+        entity.Name      = normalizedName;
+        entity.Capacity  = request.Capacity;
+        entity.Status    = request.Status;
         entity.UpdatedAt = DateTime.UtcNow;
 
         _unitOfWork.Classes.Update(entity);
@@ -110,7 +115,8 @@ public class ClassService : IClassService
     {
         var classes = await _unitOfWork.Classes.GetFilteredWithIncludesAsync(
             filter.AcademicYearId,
-            filter.GradeLevelId);
+            filter.GradeLevelId,
+            filter.Status);
 
         return OperationResult<IEnumerable<ClassDto>>.Success(
             _mapper.Map<IEnumerable<ClassDto>>(classes),
@@ -176,7 +182,12 @@ public class ClassService : IClassService
             var student = (await _unitOfWork.Students.FindAsync(s => s.FullName == studentName)).FirstOrDefault();
             if (student is null)
             {
-                student = new Student { FullName = studentName, IsActive = true };
+                student = new Student
+                {
+                    FullName = studentName,
+                    IsActive = true,
+                    LifecycleStatus = StudentLifecycleStatus.Active
+                };
                 await _unitOfWork.Students.AddAsync(student);
                 await _unitOfWork.SaveChangesAsync();
             }
@@ -236,6 +247,121 @@ public class ClassService : IClassService
             _mapper.Map<ClassDto>(withIncludes),
             "تم إنشاء الفصل مع الطلاب بنجاح");
     }
+
+    public async Task<OperationResult<CopyClassesFromYearResultDto>> PreviewCopyClassesFromYearAsync(
+        CopyClassesFromYearRequest request)
+    {
+        var validation = await ValidateCopyClassesRequestAsync(request);
+        if (!validation.IsSuccess)
+            return validation;
+
+        var result = await BuildCopyClassesPlanAsync(request);
+        return OperationResult<CopyClassesFromYearResultDto>.Success(
+            result,
+            "تم تجهيز معاينة نسخ الفصول بنجاح");
+    }
+
+    public async Task<OperationResult<CopyClassesFromYearResultDto>> CopyClassesFromYearAsync(
+        CopyClassesFromYearRequest request)
+    {
+        var validation = await ValidateCopyClassesRequestAsync(request);
+        if (!validation.IsSuccess)
+            return validation;
+
+        var result = await BuildCopyClassesPlanAsync(request);
+        var itemsToCreate = result.Items.Where(item => !item.AlreadyExists).ToList();
+
+        foreach (var item in itemsToCreate)
+        {
+            await _unitOfWork.Classes.AddAsync(new SchoolClass
+            {
+                GradeLevelId = item.GradeLevelId,
+                AcademicYearId = request.TargetAcademicYearId,
+                Name = item.ClassName,
+                Capacity = item.Capacity,
+                Status = Project.Domain.Enums.ClassStatus.Active
+            });
+        }
+
+        if (itemsToCreate.Count > 0)
+            await _unitOfWork.SaveChangesAsync();
+
+        result.CreatedCount = itemsToCreate.Count;
+        result.SkippedExistingCount = result.Items.Count(item => item.AlreadyExists);
+
+        return OperationResult<CopyClassesFromYearResultDto>.Success(
+            result,
+            result.CreatedCount == 0
+                ? "كل الفصول موجودة بالفعل في السنة الهدف"
+                : $"تم نسخ {result.CreatedCount} فصل بنجاح");
+    }
+
+    private async Task<OperationResult<CopyClassesFromYearResultDto>> ValidateCopyClassesRequestAsync(
+        CopyClassesFromYearRequest request)
+    {
+        if (request.SourceAcademicYearId == request.TargetAcademicYearId)
+            return OperationResult<CopyClassesFromYearResultDto>.Failure("السنة المصدر والهدف يجب أن تكونا مختلفتين");
+
+        var sourceYear = await _unitOfWork.AcademicYears.GetByIdAsync(request.SourceAcademicYearId);
+        if (sourceYear is null || sourceYear.IsDeleted)
+            return OperationResult<CopyClassesFromYearResultDto>.Failure("السنة الدراسية المصدر غير موجودة");
+
+        var targetYear = await _unitOfWork.AcademicYears.GetByIdAsync(request.TargetAcademicYearId);
+        if (targetYear is null || targetYear.IsDeleted)
+            return OperationResult<CopyClassesFromYearResultDto>.Failure("السنة الدراسية الهدف غير موجودة");
+
+        if (targetYear.StartDate <= sourceYear.StartDate)
+            return OperationResult<CopyClassesFromYearResultDto>.Failure("السنة الهدف يجب أن تبدأ بعد السنة المصدر");
+
+        return OperationResult<CopyClassesFromYearResultDto>.Success(new CopyClassesFromYearResultDto());
+    }
+
+    private async Task<CopyClassesFromYearResultDto> BuildCopyClassesPlanAsync(
+        CopyClassesFromYearRequest request)
+    {
+        var sourceClasses = await _unitOfWork.Classes.GetByAcademicYearAsync(request.SourceAcademicYearId);
+        var targetClasses = await _unitOfWork.Classes.GetByAcademicYearAsync(request.TargetAcademicYearId);
+
+        var targetLookup = targetClasses
+            .GroupBy(c => BuildClassCopyKey(c.GradeLevelId, c.Name))
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var items = sourceClasses
+            .OrderBy(c => c.GradeLevel.LevelOrder)
+            .ThenBy(c => c.Name)
+            .Select(sourceClass =>
+            {
+                targetLookup.TryGetValue(
+                    BuildClassCopyKey(sourceClass.GradeLevelId, sourceClass.Name),
+                    out var existingTargetClass);
+
+                return new CopyClassesFromYearPreviewDto
+                {
+                    SourceClassId = sourceClass.Id,
+                    GradeLevelId = sourceClass.GradeLevelId,
+                    GradeLevelName = sourceClass.GradeLevel?.Name ?? string.Empty,
+                    ClassName = sourceClass.Name,
+                    Capacity = sourceClass.Capacity,
+                    Status = (int)sourceClass.Status,
+                    AlreadyExists = existingTargetClass is not null,
+                    TargetClassId = existingTargetClass?.Id
+                };
+            })
+            .ToList();
+
+        return new CopyClassesFromYearResultDto
+        {
+            SourceAcademicYearId = request.SourceAcademicYearId,
+            TargetAcademicYearId = request.TargetAcademicYearId,
+            TotalSourceClasses = items.Count,
+            CreatedCount = 0,
+            SkippedExistingCount = items.Count(item => item.AlreadyExists),
+            Items = items
+        };
+    }
+
+    private static string BuildClassCopyKey(int gradeLevelId, string className)
+        => $"{gradeLevelId}|{className.Trim()}";
 
     public async Task<OperationResult<int>> GetClassCountAsync(int? academicYearId = null)
     {

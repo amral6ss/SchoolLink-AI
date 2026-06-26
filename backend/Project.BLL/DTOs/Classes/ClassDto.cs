@@ -8,4 +8,7 @@ public class ClassDto
     public string GradeLevelName   { get; set; } = string.Empty;
     public int    AcademicYearId   { get; set; }
     public string AcademicYearName { get; set; } = string.Empty;
+    public int?   Capacity         { get; set; }
+    public int    Status           { get; set; }
+    public string StatusName       { get; set; } = string.Empty;
 }

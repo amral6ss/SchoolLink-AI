@@ -7,7 +7,11 @@ import {
   ClassStudentsBrowserResult,
   ClassStudentsBrowserService
 } from '../../core/services/class-students-browser.service';
-import { ClassEntity, ClassService } from '../../core/services/class.service';
+import {
+  ClassEntity,
+  ClassService,
+  CopyClassesFromYearResult
+} from '../../core/services/class.service';
 import { GradeLevel, GradeLevelService } from '../../core/services/grade-level.service';
 import {
   ClassEnrollmentPickerService,
@@ -109,7 +113,18 @@ export class ClassManagement implements OnInit {
   successMessage = signal('');
   deleteClassConfirmId = signal<number | null>(null);
 
-  newClass: Partial<ClassEntity> = { name: '', gradeLevelId: 0, academicYearId: 0 };
+  newClass: Partial<ClassEntity> = {
+    name: '',
+    gradeLevelId: 0,
+    academicYearId: 0,
+    capacity: null,
+    status: 1
+  };
+
+  copySourceAcademicYearId: number | null = null;
+  copyTargetAcademicYearId: number | null = null;
+  copyPreview = signal<CopyClassesFromYearResult | null>(null);
+  copyLoading = signal(false);
 
   classStudents = computed<ClassStudentBrowserItem[]>(() => {
     return this.studentsBrowserResult()?.students.items ?? [];
@@ -212,7 +227,9 @@ export class ClassManagement implements OnInit {
     this.newClass = {
       name: cls.name,
       gradeLevelId: cls.gradeLevelId,
-      academicYearId: cls.academicYearId
+      academicYearId: cls.academicYearId,
+      capacity: cls.capacity ?? null,
+      status: cls.status ?? 1
     };
 
     setTimeout(() => {
@@ -225,15 +242,21 @@ export class ClassManagement implements OnInit {
     const yearId = this.selectedYearFilter
       ?? this.academicYears().find(y => y.isCurrent)?.id
       ?? 0;
-    this.newClass = { name: '', gradeLevelId: 0, academicYearId: yearId };
+    this.newClass = { name: '', gradeLevelId: 0, academicYearId: yearId, capacity: null, status: 1 };
   }
 
   saveClass() {
     if (!this.newClass.name?.trim() || !this.newClass.gradeLevelId || !this.newClass.academicYearId) return;
 
     if (this.editingClassId()) {
-      const { name, gradeLevelId, academicYearId } = this.newClass;
-      this.classService.update(this.editingClassId()!, { name, gradeLevelId, academicYearId }).subscribe({
+      const { name, gradeLevelId, academicYearId, capacity, status } = this.newClass;
+      this.classService.update(this.editingClassId()!, {
+        name,
+        gradeLevelId,
+        academicYearId,
+        capacity: capacity || null,
+        status: status ?? 1
+      }).subscribe({
         next: () => {
           this.loadClasses();
           this.cancelEdit();
@@ -245,7 +268,13 @@ export class ClassManagement implements OnInit {
         }
       });
     } else {
-      this.classService.create({ name: this.newClass.name, gradeLevelId: this.newClass.gradeLevelId, academicYearId: this.newClass.academicYearId }).subscribe({
+      this.classService.create({
+        name: this.newClass.name,
+        gradeLevelId: this.newClass.gradeLevelId,
+        academicYearId: this.newClass.academicYearId,
+        capacity: this.newClass.capacity || null,
+        status: this.newClass.status ?? 1
+      }).subscribe({
         next: () => {
           this.loadClasses();
           this.cancelEdit();
@@ -412,6 +441,62 @@ export class ClassManagement implements OnInit {
       month: 'short',
       day: 'numeric'
     }).format(date);
+  }
+
+  getClassStatusLabel(status?: number | null): string {
+    if (status === 2) return 'مغلق';
+    if (status === 3) return 'مؤرشف';
+    return 'نشط';
+  }
+
+  previewCopyClasses() {
+    if (!this.copySourceAcademicYearId || !this.copyTargetAcademicYearId) {
+      this.showError('اختر السنة المصدر والسنة الهدف أولاً.');
+      return;
+    }
+
+    this.copyLoading.set(true);
+    this.copyPreview.set(null);
+    this.classService.previewCopyFromYear({
+      sourceAcademicYearId: this.copySourceAcademicYearId,
+      targetAcademicYearId: this.copyTargetAcademicYearId
+    }).subscribe({
+      next: (res) => {
+        this.copyPreview.set(res.data ?? res);
+        this.copyLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Copy preview failed', err);
+        this.copyLoading.set(false);
+        this.showError(err?.error?.message || 'فشل في معاينة نسخ الفصول.');
+      }
+    });
+  }
+
+  executeCopyClasses() {
+    if (!this.copySourceAcademicYearId || !this.copyTargetAcademicYearId) {
+      this.showError('اختر السنة المصدر والسنة الهدف أولاً.');
+      return;
+    }
+
+    this.copyLoading.set(true);
+    this.classService.copyFromYear({
+      sourceAcademicYearId: this.copySourceAcademicYearId,
+      targetAcademicYearId: this.copyTargetAcademicYearId
+    }).subscribe({
+      next: (res) => {
+        this.copyPreview.set(res.data ?? res);
+        this.copyLoading.set(false);
+        this.selectedYearFilter = this.copyTargetAcademicYearId;
+        this.loadClasses();
+        this.showSuccess(res.message || 'تم نسخ الفصول بنجاح.');
+      },
+      error: (err) => {
+        console.error('Copy classes failed', err);
+        this.copyLoading.set(false);
+        this.showError(err?.error?.message || 'فشل في نسخ الفصول.');
+      }
+    });
   }
 
   private showError(msg: string) {

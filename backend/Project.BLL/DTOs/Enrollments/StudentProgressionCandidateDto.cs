@@ -1,3 +1,5 @@
+using Project.Domain.Enums;
+
 namespace Project.BLL.DTOs.Enrollments;
 
 /// <summary>
@@ -62,6 +64,8 @@ public class StudentProgressionCandidateDto
     public string AcademicYearName { get; set; } = string.Empty;
 
     public bool StudentIsActive { get; set; }
+    public StudentLifecycleStatus StudentLifecycleStatus { get; set; }
+    public string StudentLifecycleStatusName { get; set; } = string.Empty;
     public bool HasStudentAccount { get; set; }
 
     public bool HasFinalGrade { get; set; }

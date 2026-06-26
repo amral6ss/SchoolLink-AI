@@ -30,6 +30,7 @@ public interface ISchoolClassRepository : IRepository<SchoolClass>
     Task<IReadOnlyList<SchoolClass>> GetFilteredWithIncludesAsync(
         int? academicYearId,
         int? gradeLevelId,
+        int? status,
         CancellationToken ct = default);
 }
 

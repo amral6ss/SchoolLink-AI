@@ -431,6 +431,92 @@
   font-weight: 800;
 }
 
+.class-mapping-panel {
+  padding: 14px;
+  border: 1.5px solid rgba(0, 35, 111, 0.12);
+  border-radius: 16px;
+  background: rgba(241, 245, 255, 0.72);
+}
+
+.class-mapping-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.class-mapping-head p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.class-mapping-head .smart-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.class-mapping-head .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.class-mapping-list {
+  display: grid;
+  gap: 10px;
+}
+
+.class-mapping-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.9fr) 28px minmax(180px, 1.2fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.source-class-box {
+  min-height: 46px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 35, 111, 0.1);
+  background: rgba(255, 255, 255, 0.78);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.source-class-name {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.source-class-box small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mapping-arrow {
+  color: #00236f;
+  font-size: 21px;
+  justify-self: center;
+  opacity: 0.72;
+}
+
+.mapping-empty {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(254, 243, 199, 0.72);
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* ─── Action Buttons (premium, with shimmer) ─────────────────── */
 
 .prg-btn {
@@ -1046,6 +1132,19 @@
 
   .glass-panel { border-radius: 20px; }
 
+  .class-mapping-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .class-mapping-row {
+    grid-template-columns: 1fr;
+  }
+
+  .mapping-arrow {
+    transform: rotate(-90deg);
+  }
+
   .candidates-table thead th,
   .candidates-table tbody td { padding: 10px 10px; font-size: 13px; }
 
@@ -1111,6 +1210,254 @@
 .status-counter-missing  { border-color: rgba(107,114,128,.35); background: rgba(107,114,128,.08); }
 .status-counter-missing  .status-counter-value { color: #374151; }
 
+/* ─── Annual decision summary ───────────────────────────────── */
+
+.annual-decision-panel {
+  margin-bottom: 24px;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(0, 35, 111, 0.08);
+  box-shadow: 0 10px 28px rgba(0, 35, 111, 0.08);
+}
+
+.annual-decision-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.annual-decision-head h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.annual-decision-head .smart-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.annual-decision-head .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.annual-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.annual-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 82px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid;
+}
+
+.annual-card .material-symbols-outlined {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  font-size: 22px;
+  color: #fff;
+}
+
+.annual-card strong {
+  display: block;
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.annual-card small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.annual-card-promote {
+  background: rgba(219, 234, 254, 0.72);
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.annual-card-promote .material-symbols-outlined {
+  background: linear-gradient(135deg, #00236f, #2d5be3);
+}
+
+.annual-card-graduate {
+  background: rgba(204, 251, 241, 0.72);
+  border-color: rgba(13, 148, 136, 0.22);
+}
+
+.annual-card-graduate .material-symbols-outlined {
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+}
+
+.annual-card-retain {
+  background: rgba(254, 243, 199, 0.72);
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+.annual-card-retain .material-symbols-outlined {
+  background: linear-gradient(135deg, #b45309, #f59e0b);
+}
+
+.annual-card-pending {
+  background: rgba(241, 245, 249, 0.86);
+  border-color: rgba(100, 116, 139, 0.18);
+}
+
+.annual-card-pending .material-symbols-outlined {
+  background: linear-gradient(135deg, #475569, #94a3b8);
+}
+
+.annual-basis-box {
+  min-height: 75px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(0, 35, 111, 0.12);
+  background: rgba(241, 245, 255, 0.82);
+}
+
+.annual-basis-label {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.annual-basis-box strong {
+  display: block;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.annual-basis-box small {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.decision-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.decision-promote {
+  color: #1e3a8a;
+  background: rgba(219, 234, 254, 0.92);
+  border-color: rgba(37, 99, 235, 0.22);
+}
+
+.decision-graduate {
+  color: #0f766e;
+  background: rgba(204, 251, 241, 0.92);
+  border-color: rgba(13, 148, 136, 0.24);
+}
+
+.decision-retain {
+  color: #92400e;
+  background: rgba(254, 243, 199, 0.94);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.decision-pending {
+  color: #475569;
+  background: rgba(241, 245, 249, 0.94);
+  border-color: rgba(100, 116, 139, 0.2);
+}
+
+.failed-subjects {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.pending-reason {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.action-guidance {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(219, 234, 254, 0.78);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  color: #1e3a8a;
+}
+
+.action-guidance.action-guidance-retain {
+  background: rgba(254, 243, 199, 0.78);
+  border-color: rgba(245, 158, 11, 0.26);
+  color: #92400e;
+}
+
+.action-guidance.action-guidance-graduate {
+  background: rgba(204, 251, 241, 0.78);
+  border-color: rgba(13, 148, 136, 0.22);
+  color: #0f766e;
+}
+
+.action-guidance > .material-symbols-outlined {
+  font-size: 24px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.action-guidance strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.action-guidance p {
+  margin: 0;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.selected-health {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.selected-health span {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 /* ─── Expand button + subject breakdown row ──────────────────── */
 
 .expand-btn {
@@ -1168,6 +1515,11 @@
   background: rgba(239,68,68,.06);
 }
 
+.subject-chip.subject-pending {
+  border-color: rgba(245,158,11,.35);
+  background: rgba(245,158,11,.06);
+}
+
 .subject-chip-head {
   display: flex;
   align-items: center;
@@ -1216,3 +1568,24 @@
   color: #b91c1c;
 }
 
+.subject-pending .subject-chip-badge {
+  background: rgba(245,158,11,.16);
+  color: #b45309;
+}
+
+@media (max-width: 900px) {
+  .annual-decision-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .annual-decision-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .annual-decision-grid {
+    grid-template-columns: 1fr;
+  }
+}

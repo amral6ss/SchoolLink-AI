@@ -356,7 +356,7 @@ export class GradeMonitorService {
 
   // ─── Real Classes (for dropdown picker) ──────────────
   getClasses() {
-    return this.http.get<any>(`${this.base}/class-management`);
+    return this.http.get<any>(`${this.base}/class-management?status=1`);
   }
 
   getMyClassesCurrentYear() {

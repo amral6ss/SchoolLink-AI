@@ -1,4 +1,4 @@
-using Common.Results;
+﻿using Common.Results;
 using Project.BLL.DTOs.Enrollments;
 using Project.BLL.Interfaces;
 using Project.DAL.Interfaces;
@@ -77,6 +77,7 @@ public class StudentProgressionService : IStudentProgressionService
                 academicYear,
                 finalGradesByEnrollmentId,
                 subjectNamesById,
+                termsToLoad,
                 passingThreshold))
             .ToList();
 
@@ -97,17 +98,18 @@ public class StudentProgressionService : IStudentProgressionService
         AcademicYear academicYear,
         IReadOnlyDictionary<int, List<FinalGrade>> finalGradesByEnrollmentId,
         IReadOnlyDictionary<int, string> subjectNamesById,
+        IReadOnlyCollection<AcademicTerm> requiredTerms,
         decimal passingThreshold)
     {
         finalGradesByEnrollmentId.TryGetValue(enrollment.Id, out var grades);
         grades ??= new List<FinalGrade>();
 
         var hasAnyFinalGrade = grades.Count != 0;
-        var publishedGrades = grades.Where(g => g.IsPublished).ToList();
-        var hasPublishedFinalGrade = publishedGrades.Count != 0;
+        var hasPublishedFinalGrade = grades.Any(g => g.IsPublished);
+        var hasIncompleteOrUnpublishedGrade = grades.Any(g => !g.IsPublished || !g.IsComplete || g.MaxTotal <= 0);
 
-        // Aggregate per subject across the chosen term scope (average of the terms we loaded).
-        var subjectGroups = publishedGrades
+        // Aggregate per subject across the chosen term scope using score totals.
+        var subjectGroups = grades
             .GroupBy(g => g.SubjectId)
             .ToList();
 
@@ -119,17 +121,28 @@ public class StudentProgressionService : IStudentProgressionService
         {
             var subjectId = subjectGroup.Key;
             var subjectGradeRows = subjectGroup.ToList();
+            var termsPresent = subjectGradeRows.Select(g => g.Term).Distinct().ToHashSet();
+            var hasAllRequiredTerms = requiredTerms.All(termsPresent.Contains);
+            var isReadyForDecision = hasAllRequiredTerms &&
+                subjectGradeRows.All(g => g.IsPublished && g.IsComplete && g.MaxTotal > 0);
 
-            // Average the percentage across terms within the scope.
-            var percentage = subjectGradeRows
+            if (!isReadyForDecision)
+                hasIncompleteOrUnpublishedGrade = true;
+
+            var totalScore = subjectGradeRows
                 .Where(g => g.MaxTotal > 0)
-                .Select(g => (decimal)g.Total / g.MaxTotal * 100m)
-                .DefaultIfEmpty(0m)
-                .Average();
+                .Sum(g => g.Total);
+            var maxScore = subjectGradeRows
+                .Where(g => g.MaxTotal > 0)
+                .Sum(g => g.MaxTotal);
 
+            var percentage = maxScore > 0 ? totalScore / maxScore * 100m : 0m;
             percentage = Math.Round(percentage, 1);
-            var isPassed = percentage >= passingThreshold;
-            if (isPassed) passed++; else failed++;
+            var isPassed = isReadyForDecision && percentage >= passingThreshold;
+            if (isReadyForDecision)
+            {
+                if (isPassed) passed++; else failed++;
+            }
 
             // Representative term for display (first available within the scope).
             var representativeTerm = subjectGradeRows
@@ -144,9 +157,9 @@ public class StudentProgressionService : IStudentProgressionService
                     ? name
                     : "غير محدد",
                 Percentage = percentage,
-                IsPublished = true,
+                IsPublished = isReadyForDecision,
                 IsPassed = isPassed,
-                Term = MapTerm(representativeTerm)
+                Term = requiredTerms.Count == 1 ? MapTerm(representativeTerm) : null
             });
         }
 
@@ -154,7 +167,7 @@ public class StudentProgressionService : IStudentProgressionService
         AcademicStatus status;
         if (!hasAnyFinalGrade)
             status = AcademicStatus.NoGrades;
-        else if (!hasPublishedFinalGrade)
+        else if (!hasPublishedFinalGrade || hasIncompleteOrUnpublishedGrade)
             status = AcademicStatus.Unpublished;
         else if (failed == 0 && passed > 0)
             status = AcademicStatus.Passed;
@@ -162,7 +175,7 @@ public class StudentProgressionService : IStudentProgressionService
             status = AcademicStatus.Failed;
 
         // A single overall percentage to display (average of published subjects).
-        var finalTotal = hasPublishedFinalGrade
+        var finalTotal = subjectGrades.Count != 0
             ? Math.Round(subjectGrades.Average(sg => sg.Percentage), 1)
             : (decimal?)null;
 
@@ -178,6 +191,8 @@ public class StudentProgressionService : IStudentProgressionService
             AcademicYearId = enrollment.AcademicYearId,
             AcademicYearName = academicYear.Name,
             StudentIsActive = enrollment.Student.IsActive,
+            StudentLifecycleStatus = enrollment.Student.LifecycleStatus,
+            StudentLifecycleStatusName = enrollment.Student.LifecycleStatus.ToString(),
             HasStudentAccount = enrollment.Student.UserId.HasValue,
             HasFinalGrade = hasAnyFinalGrade,
             HasPublishedFinalGrade = hasPublishedFinalGrade,
@@ -199,6 +214,69 @@ public class StudentProgressionService : IStudentProgressionService
             _ => null
         };
 
+    private async Task<AcademicStatus> CalculateAnnualAcademicStatusAsync(
+        int enrollmentId,
+        decimal passingThreshold,
+        CancellationToken ct)
+    {
+        var requiredTerms = GetTermsForScope(ProgressionTermScope.BothSemesters);
+        var grades = await _unitOfWork.FinalGrades.FindAsync(
+            fg => !fg.IsDeleted &&
+                  fg.EnrollmentId == enrollmentId &&
+                  requiredTerms.Contains(fg.Term),
+            ct);
+
+        if (grades.Count == 0)
+            return AcademicStatus.NoGrades;
+
+        if (!grades.Any(g => g.IsPublished))
+            return AcademicStatus.Unpublished;
+
+        var subjectGroups = grades.GroupBy(g => g.SubjectId).ToList();
+        var hasFailedSubject = false;
+
+        foreach (var subjectGroup in subjectGroups)
+        {
+            var subjectGrades = subjectGroup.ToList();
+            var termsPresent = subjectGrades.Select(g => g.Term).Distinct().ToHashSet();
+            var hasAllRequiredTerms = requiredTerms.All(termsPresent.Contains);
+            var isReadyForDecision = hasAllRequiredTerms &&
+                subjectGrades.All(g => g.IsPublished && g.IsComplete && g.MaxTotal > 0);
+
+            if (!isReadyForDecision)
+                return AcademicStatus.Unpublished;
+
+            var totalScore = subjectGrades.Sum(g => g.Total);
+            var maxScore = subjectGrades.Sum(g => g.MaxTotal);
+            var percentage = maxScore > 0 ? totalScore / maxScore * 100m : 0m;
+
+            if (percentage < passingThreshold)
+                hasFailedSubject = true;
+        }
+
+        return hasFailedSubject ? AcademicStatus.Failed : AcademicStatus.Passed;
+    }
+
+    private static string? ValidateTargetClass(
+        SchoolClass? targetClass,
+        int targetAcademicYearId,
+        int expectedGradeLevelId)
+    {
+        if (targetClass is null || targetClass.IsDeleted)
+            return "الفصل الهدف غير موجود";
+
+        if (targetClass.AcademicYearId != targetAcademicYearId)
+            return "الفصل الهدف لا ينتمي إلى السنة الدراسية الهدف";
+
+        if (targetClass.GradeLevelId != expectedGradeLevelId)
+            return "الفصل الهدف لا ينتمي إلى الصف الدراسي المطلوب";
+
+        if (targetClass.Status != ClassStatus.Active)
+            return "الفصل الهدف غير نشط";
+
+        return null;
+    }
+
     public async Task<OperationResult<StudentProgressionResultDto>> ExecuteAsync(
         StudentProgressionRequest request,
         CancellationToken ct = default)
@@ -217,9 +295,8 @@ public class StudentProgressionService : IStudentProgressionService
         if (!Enum.IsDefined(request.Action))
             return OperationResult<StudentProgressionResultDto>.Failure("نوع العملية غير صالح");
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (request.EffectiveDate > today)
-            return OperationResult<StudentProgressionResultDto>.Failure("تاريخ التنفيذ لا يمكن أن يكون في المستقبل");
+        if (request.PassingThreshold < 0m || request.PassingThreshold > 100m)
+            return OperationResult<StudentProgressionResultDto>.Failure("نسبة النجاح يجب أن تكون بين 0 و 100");
 
         var selectedEnrollments = await _unitOfWork.StudentEnrollments.GetByIdsWithDetailsAsync(enrollmentIds, ct);
         if (selectedEnrollments.Count != enrollmentIds.Count)
@@ -230,6 +307,12 @@ public class StudentProgressionService : IStudentProgressionService
 
         if (selectedEnrollments.Any(e => e.LeftAt is not null))
             return OperationResult<StudentProgressionResultDto>.Failure("الطلب يحتوي على قيد دراسي مغلق بالفعل");
+
+        if (selectedEnrollments.Any(e =>
+                e.Student is null ||
+                !e.Student.IsActive ||
+                e.Student.LifecycleStatus != StudentLifecycleStatus.Active))
+            return OperationResult<StudentProgressionResultDto>.Failure("لا يمكن تنفيذ الترقية إلا على طلاب نشطين أكاديميا");
 
         if (selectedEnrollments.Any(e => e.Class is null || e.Class.IsDeleted || e.Class.GradeLevel is null))
             return OperationResult<StudentProgressionResultDto>.Failure("بعض القيود الدراسية تفتقد بيانات الصف الحالي");
@@ -262,6 +345,8 @@ public class StudentProgressionService : IStudentProgressionService
 
         AcademicYear? targetAcademicYear = null;
         SchoolClass? targetClass = null;
+        var targetClassesBySourceClassId = new Dictionary<int, SchoolClass>();
+        var hasClassMappings = request.ClassMappings.Any(m => m.SourceClassId > 0 || m.TargetClassId > 0);
         var note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
 
         switch (request.Action)
@@ -274,7 +359,7 @@ public class StudentProgressionService : IStudentProgressionService
                 if (!request.TargetAcademicYearId.HasValue)
                     return OperationResult<StudentProgressionResultDto>.Failure("السنة الدراسية الهدف مطلوبة للترقية");
 
-                if (!request.TargetClassId.HasValue)
+                if (!request.TargetClassId.HasValue && !hasClassMappings)
                     return OperationResult<StudentProgressionResultDto>.Failure("الفصل الهدف مطلوب للترقية");
 
                 targetAcademicYear = await _unitOfWork.AcademicYears.GetByIdAsync(request.TargetAcademicYearId.Value, ct);
@@ -287,7 +372,9 @@ public class StudentProgressionService : IStudentProgressionService
                 if (targetAcademicYear.StartDate <= sourceAcademicYear.StartDate)
                     return OperationResult<StudentProgressionResultDto>.Failure("السنة الدراسية الهدف يجب أن تبدأ بعد السنة المصدر");
 
-                targetClass = await _unitOfWork.Classes.GetByIdWithIncludesAsync(request.TargetClassId.Value, ct);
+                if (!hasClassMappings)
+                {
+                    targetClass = await _unitOfWork.Classes.GetByIdWithIncludesAsync(request.TargetClassId.GetValueOrDefault(), ct);
                 if (targetClass is null || targetClass.IsDeleted)
                     return OperationResult<StudentProgressionResultDto>.Failure("الفصل الهدف غير موجود");
 
@@ -296,13 +383,22 @@ public class StudentProgressionService : IStudentProgressionService
 
                 if (targetClass.GradeLevelId != nextGradeLevel.Id)
                     return OperationResult<StudentProgressionResultDto>.Failure("الفصل الهدف يجب أن ينتمي إلى الصف التالي مباشرة");
+
+                if (targetClass.Status != ClassStatus.Active)
+                    return OperationResult<StudentProgressionResultDto>.Failure("الفصل الهدف غير نشط");
+
+                }
+
+                if (request.EffectiveDate < targetAcademicYear.StartDate ||
+                    request.EffectiveDate > targetAcademicYear.EndDate)
+                    return OperationResult<StudentProgressionResultDto>.Failure("تاريخ التنفيذ يجب أن يقع داخل السنة الدراسية الهدف");
                 break;
 
             case StudentProgressionActionType.Retain:
                 if (!request.TargetAcademicYearId.HasValue)
                     return OperationResult<StudentProgressionResultDto>.Failure("السنة الدراسية الهدف مطلوبة للإبقاء");
 
-                if (!request.TargetClassId.HasValue)
+                if (!request.TargetClassId.HasValue && !hasClassMappings)
                     return OperationResult<StudentProgressionResultDto>.Failure("الفصل الهدف مطلوب للإبقاء");
 
                 targetAcademicYear = await _unitOfWork.AcademicYears.GetByIdAsync(request.TargetAcademicYearId.Value, ct);
@@ -315,7 +411,9 @@ public class StudentProgressionService : IStudentProgressionService
                 if (targetAcademicYear.StartDate <= sourceAcademicYear.StartDate)
                     return OperationResult<StudentProgressionResultDto>.Failure("السنة الدراسية الهدف يجب أن تبدأ بعد السنة المصدر");
 
-                targetClass = await _unitOfWork.Classes.GetByIdWithIncludesAsync(request.TargetClassId.Value, ct);
+                if (!hasClassMappings)
+                {
+                    targetClass = await _unitOfWork.Classes.GetByIdWithIncludesAsync(request.TargetClassId.GetValueOrDefault(), ct);
                 if (targetClass is null || targetClass.IsDeleted)
                     return OperationResult<StudentProgressionResultDto>.Failure("الفصل الهدف غير موجود");
 
@@ -324,6 +422,14 @@ public class StudentProgressionService : IStudentProgressionService
 
                 if (targetClass.GradeLevelId != sourceGradeLevel.Id)
                     return OperationResult<StudentProgressionResultDto>.Failure("الفصل الهدف يجب أن ينتمي إلى نفس الصف الدراسي المصدر");
+
+                if (targetClass.Status != ClassStatus.Active)
+                    return OperationResult<StudentProgressionResultDto>.Failure("الفصل الهدف غير نشط");
+
+                }
+                if (request.EffectiveDate < targetAcademicYear.StartDate ||
+                    request.EffectiveDate > targetAcademicYear.EndDate)
+                    return OperationResult<StudentProgressionResultDto>.Failure("تاريخ التنفيذ يجب أن يقع داخل السنة الدراسية الهدف");
                 break;
 
             case StudentProgressionActionType.Graduate:
@@ -335,6 +441,50 @@ public class StudentProgressionService : IStudentProgressionService
                     return OperationResult<StudentProgressionResultDto>.Failure(
                         "لا يجب إرسال سنة دراسية أو فصل هدف عند تنفيذ التخرج");
                 break;
+        }
+
+        if (request.Action is StudentProgressionActionType.Promote or StudentProgressionActionType.Retain)
+        {
+            if (targetAcademicYear is null)
+                return OperationResult<StudentProgressionResultDto>.Failure("بيانات الوجهة غير مكتملة");
+
+            var expectedTargetGradeLevelId = request.Action == StudentProgressionActionType.Promote
+                ? nextGradeLevel!.Id
+                : sourceGradeLevel.Id;
+
+            var selectedSourceClassIds = selectedEnrollments
+                .Select(e => e.ClassId)
+                .Distinct()
+                .ToList();
+
+            if (hasClassMappings)
+            {
+                var mappings = request.ClassMappings
+                    .Where(m => m.SourceClassId > 0 && m.TargetClassId > 0)
+                    .GroupBy(m => m.SourceClassId)
+                    .ToDictionary(g => g.Key, g => g.First().TargetClassId);
+
+                if (selectedSourceClassIds.Any(sourceClassId => !mappings.ContainsKey(sourceClassId)))
+                    return OperationResult<StudentProgressionResultDto>.Failure("يجب تحديد فصل هدف لكل فصل مصدر في الطلاب المحددين");
+
+                foreach (var sourceClassId in selectedSourceClassIds)
+                {
+                    var mappedTargetClass = await _unitOfWork.Classes.GetByIdWithIncludesAsync(mappings[sourceClassId], ct);
+                    var validationError = ValidateTargetClass(mappedTargetClass, targetAcademicYear.Id, expectedTargetGradeLevelId);
+                    if (validationError is not null)
+                        return OperationResult<StudentProgressionResultDto>.Failure(validationError);
+
+                    targetClassesBySourceClassId[sourceClassId] = mappedTargetClass!;
+                }
+            }
+            else
+            {
+                if (targetClass is null)
+                    return OperationResult<StudentProgressionResultDto>.Failure("الفصل الهدف غير موجود");
+
+                foreach (var sourceClassId in selectedSourceClassIds)
+                    targetClassesBySourceClassId[sourceClassId] = targetClass;
+            }
         }
 
         var result = new StudentProgressionResultDto
@@ -404,9 +554,43 @@ public class StudentProgressionService : IStudentProgressionService
                     continue;
                 }
 
+                var academicStatus = await CalculateAnnualAcademicStatusAsync(
+                    currentEnrollment.Id,
+                    request.PassingThreshold,
+                    ct);
+
+                if (request.Action is StudentProgressionActionType.Promote or StudentProgressionActionType.Graduate &&
+                    academicStatus != AcademicStatus.Passed)
+                {
+                    await AddFailureAndRollbackAsync(
+                        result,
+                        currentEnrollment.Id,
+                        currentEnrollment.StudentId,
+                        currentEnrollment.Student.FullName,
+                        "لا يمكن ترقية أو تخريج الطالب قبل نجاحه في نتيجة السنة كاملة",
+                        ct);
+                    continue;
+                }
+
+                if (request.Action == StudentProgressionActionType.Retain &&
+                    academicStatus != AcademicStatus.Failed)
+                {
+                    await AddFailureAndRollbackAsync(
+                        result,
+                        currentEnrollment.Id,
+                        currentEnrollment.StudentId,
+                        currentEnrollment.Student.FullName,
+                        "لا يمكن إبقاء الطالب إلا إذا كان راسبا في نتيجة السنة كاملة",
+                        ct);
+                    continue;
+                }
+
+                SchoolClass? resolvedTargetClassForStudent = null;
+
                 if (request.Action is StudentProgressionActionType.Promote or StudentProgressionActionType.Retain)
                 {
-                    if (targetAcademicYear is null || targetClass is null)
+                    if (targetAcademicYear is null ||
+                        !targetClassesBySourceClassId.TryGetValue(currentEnrollment.ClassId, out var resolvedTargetClass))
                     {
                         await AddFailureAndRollbackAsync(
                             result,
@@ -417,6 +601,8 @@ public class StudentProgressionService : IStudentProgressionService
                             ct);
                         continue;
                     }
+
+                    resolvedTargetClassForStudent = resolvedTargetClass;
 
                     var hasActiveEnrollment = await _unitOfWork.StudentEnrollments
                         .HasActiveEnrollmentAsync(currentEnrollment.StudentId, targetAcademicYear.Id, ct);
@@ -432,6 +618,26 @@ public class StudentProgressionService : IStudentProgressionService
                             ct);
                         continue;
                     }
+
+                    if (resolvedTargetClass.Capacity.HasValue)
+                    {
+                        var activeCount = await _unitOfWork.StudentEnrollments.GetActiveCountByClassAsync(
+                            resolvedTargetClass.Id,
+                            targetAcademicYear.Id,
+                            ct);
+
+                        if (activeCount >= resolvedTargetClass.Capacity.Value)
+                        {
+                            await AddFailureAndRollbackAsync(
+                                result,
+                                currentEnrollment.Id,
+                                currentEnrollment.StudentId,
+                                currentEnrollment.Student.FullName,
+                                "الفصل الهدف وصل إلى السعة القصوى",
+                                ct);
+                            continue;
+                        }
+                    }
                 }
 
                 currentEnrollment.LeftAt = request.EffectiveDate;
@@ -446,7 +652,7 @@ public class StudentProgressionService : IStudentProgressionService
                         await _unitOfWork.StudentEnrollments.AddAsync(new StudentEnrollment
                         {
                             StudentId = currentEnrollment.StudentId,
-                            ClassId = targetClass!.Id,
+                            ClassId = resolvedTargetClassForStudent!.Id,
                             AcademicYearId = targetAcademicYear!.Id,
                             EnrolledAt = request.EffectiveDate
                         }, ct);
@@ -459,27 +665,9 @@ public class StudentProgressionService : IStudentProgressionService
                         break;
 
                     case StudentProgressionActionType.Graduate:
-                        currentEnrollment.Student.IsActive = false;
+                        currentEnrollment.Student.LifecycleStatus = StudentLifecycleStatus.Graduated;
                         currentEnrollment.Student.UpdatedAt = DateTime.UtcNow;
                         _unitOfWork.Students.Update(currentEnrollment.Student);
-                        deactivatedStudents.Add(currentEnrollment.Student.FullName);
-
-                        if (currentEnrollment.Student.UserId.HasValue)
-                        {
-                            var studentUser = await _unitOfWork.Users.GetByIdAsync(currentEnrollment.Student.UserId.Value, ct);
-                            if (studentUser is not null && !studentUser.IsDeleted && studentUser.IsActive)
-                            {
-                                studentUser.IsActive = false;
-                                studentUser.UpdatedAt = DateTime.UtcNow;
-                                _unitOfWork.Users.Update(studentUser);
-                                await _unitOfWork.RefreshTokens.RevokeAllForUserAsync(studentUser.Id, ct);
-                            }
-                        }
-
-                        await DeactivateParentAccountsIfNeededAsync(
-                            currentEnrollment.StudentId,
-                            deactivatedParents,
-                            ct);
 
                         result.SuccessCount++;
                         result.GraduatedCount++;

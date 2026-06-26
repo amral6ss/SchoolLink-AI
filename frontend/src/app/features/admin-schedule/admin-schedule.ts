@@ -649,7 +649,7 @@ export class AdminSchedule implements OnInit, OnDestroy {
         error: () => { this.showError('تعذر تحميل بيانات الصفوف الدراسية'); this.markInitialLoadDone(); },
       });
 
-    this.classService.getAll()
+    this.classService.getAll({ status: 1 })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (data: any) => { this.classes.set(this.unwrap(data)); this.markInitialLoadDone(); },

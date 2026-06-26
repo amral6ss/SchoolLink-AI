@@ -13,5 +13,7 @@ public class StudentDto
     public string? UserName { get; set; }
     public string? UserEmail { get; set; }
     public bool IsActive { get; set; }
+    public StudentLifecycleStatus LifecycleStatus { get; set; }
+    public string LifecycleStatusName { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
 }

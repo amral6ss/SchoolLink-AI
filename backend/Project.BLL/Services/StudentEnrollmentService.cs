@@ -29,6 +29,9 @@ public class StudentEnrollmentService : IStudentEnrollmentService
         if (classEntity == null || classEntity.IsDeleted)
             return OperationResult<EnrollmentDto>.Failure("الفصل غير موجود");
 
+        if (classEntity.Status != Project.Domain.Enums.ClassStatus.Active)
+            return OperationResult<EnrollmentDto>.Failure("لا يمكن تسجيل الطالب في فصل غير نشط");
+
         var year = await _unitOfWork.AcademicYears.GetByIdAsync(request.AcademicYearId);
         if (year == null || year.IsDeleted)
             return OperationResult<EnrollmentDto>.Failure("السنة الدراسية غير موجودة");
@@ -36,10 +39,17 @@ public class StudentEnrollmentService : IStudentEnrollmentService
         if (request.EnrolledAt > DateOnly.FromDateTime(DateTime.UtcNow))
             return OperationResult<EnrollmentDto>.Failure("تاريخ التسجيل لا يمكن أن يكون في المستقبل");
 
-        var existingEnrollments = await _unitOfWork.StudentEnrollments.GetHistoryByStudentAsync(request.StudentId);
-        if (existingEnrollments.Any(e => !e.IsDeleted && e.LeftAt == null
-            && e.ClassId == request.ClassId && e.AcademicYearId == request.AcademicYearId))
-            return OperationResult<EnrollmentDto>.Failure("الطالب مسجل بالفعل في هذا الفصل لنفس السنة الدراسية");
+        if (await _unitOfWork.StudentEnrollments.HasActiveEnrollmentAsync(request.StudentId, request.AcademicYearId))
+            return OperationResult<EnrollmentDto>.Failure("الطالب لديه بالفعل قيد نشط في هذه السنة الدراسية");
+
+        if (classEntity.Capacity.HasValue)
+        {
+            var activeCount = await _unitOfWork.StudentEnrollments.GetActiveCountByClassAsync(
+                request.ClassId,
+                request.AcademicYearId);
+            if (activeCount >= classEntity.Capacity.Value)
+                return OperationResult<EnrollmentDto>.Failure("الفصل وصل إلى السعة القصوى");
+        }
 
         var enrollment = _mapper.Map<StudentEnrollment>(request);
         await _unitOfWork.StudentEnrollments.AddAsync(enrollment);
@@ -61,6 +71,9 @@ public class StudentEnrollmentService : IStudentEnrollmentService
         var newClass = await _unitOfWork.Classes.GetByIdAsync(request.NewClassId);
         if (newClass == null || newClass.IsDeleted)
             return OperationResult<EnrollmentDto>.Failure("الفصل الجديد غير موجود");
+
+        if (newClass.Status != Project.Domain.Enums.ClassStatus.Active)
+            return OperationResult<EnrollmentDto>.Failure("لا يمكن نقل الطالب إلى فصل غير نشط");
 
         // Validation: Same Academic Year
         if (newClass.AcademicYearId != currentEnrollment.AcademicYearId)
@@ -93,6 +106,15 @@ public class StudentEnrollmentService : IStudentEnrollmentService
         if (existingEnrollments.Any(e => !e.IsDeleted && e.LeftAt == null
             && e.ClassId == request.NewClassId && e.AcademicYearId == currentEnrollment.AcademicYearId))
             return OperationResult<EnrollmentDto>.Failure("الطالب مسجل بالفعل في الفصل الجديد");
+
+        if (newClass.Capacity.HasValue)
+        {
+            var activeCount = await _unitOfWork.StudentEnrollments.GetActiveCountByClassAsync(
+                request.NewClassId,
+                currentEnrollment.AcademicYearId);
+            if (activeCount >= newClass.Capacity.Value)
+                return OperationResult<EnrollmentDto>.Failure("الفصل الهدف وصل إلى السعة القصوى");
+        }
 
         // Perform transfer
         currentEnrollment.LeftAt = transferDate;
@@ -289,9 +311,15 @@ public class StudentEnrollmentService : IStudentEnrollmentService
         if (classEntity == null || classEntity.IsDeleted)
             return OperationResult<BulkEnrollResultDto>.Failure("الفصل غير موجود");
 
+        if (classEntity.Status != Project.Domain.Enums.ClassStatus.Active)
+            return OperationResult<BulkEnrollResultDto>.Failure("لا يمكن تسجيل الطلاب في فصل غير نشط");
+
         var year = await _unitOfWork.AcademicYears.GetByIdAsync(request.AcademicYearId);
         if (year == null || year.IsDeleted)
             return OperationResult<BulkEnrollResultDto>.Failure("السنة الدراسية غير موجودة");
+
+        if (classEntity.AcademicYearId != request.AcademicYearId)
+            return OperationResult<BulkEnrollResultDto>.Failure("الفصل لا ينتمي إلى السنة الدراسية المحددة");
 
         if (request.EnrolledAt > DateOnly.FromDateTime(DateTime.UtcNow))
             return OperationResult<BulkEnrollResultDto>.Failure("تاريخ التسجيل لا يمكن أن يكون في المستقبل");
@@ -313,18 +341,34 @@ public class StudentEnrollmentService : IStudentEnrollmentService
                 continue;
             }
 
-            var existingEnrollments = await _unitOfWork.StudentEnrollments.GetHistoryByStudentAsync(studentId);
-            if (existingEnrollments.Any(e => !e.IsDeleted && e.LeftAt == null
-                && e.ClassId == request.ClassId && e.AcademicYearId == request.AcademicYearId))
+            if (await _unitOfWork.StudentEnrollments.HasActiveEnrollmentAsync(studentId, request.AcademicYearId))
             {
                 result.FailureCount++;
                 result.Failures.Add(new BulkEnrollFailureDto
                 {
                     StudentId = studentId,
                     StudentName = student.FullName,
-                    Reason = "الطالب مسجل بالفعل في هذا الفصل"
+                    Reason = "الطالب لديه بالفعل قيد نشط في هذه السنة الدراسية"
                 });
                 continue;
+            }
+
+            if (classEntity.Capacity.HasValue)
+            {
+                var activeCount = await _unitOfWork.StudentEnrollments.GetActiveCountByClassAsync(
+                    request.ClassId,
+                    request.AcademicYearId);
+                if (activeCount + result.SuccessCount >= classEntity.Capacity.Value)
+                {
+                    result.FailureCount++;
+                    result.Failures.Add(new BulkEnrollFailureDto
+                    {
+                        StudentId = studentId,
+                        StudentName = student.FullName,
+                        Reason = "الفصل وصل إلى السعة القصوى"
+                    });
+                    continue;
+                }
             }
 
             var enrollment = new StudentEnrollment
@@ -352,6 +396,9 @@ public class StudentEnrollmentService : IStudentEnrollmentService
         var newClass = await _unitOfWork.Classes.GetByIdAsync(request.NewClassId);
         if (newClass == null || newClass.IsDeleted)
             return OperationResult<BulkTransferResultDto>.Failure("الفصل الهدف غير موجود");
+
+        if (newClass.Status != Project.Domain.Enums.ClassStatus.Active)
+            return OperationResult<BulkTransferResultDto>.Failure("لا يمكن النقل إلى فصل غير نشط");
 
         var transferDate = request.TransferDate;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -468,6 +515,24 @@ public class StudentEnrollmentService : IStudentEnrollmentService
                     Reason = "الطالب مسجل بالفعل في الفصل الهدف"
                 });
                 continue;
+            }
+
+            if (newClass.Capacity.HasValue)
+            {
+                var activeCount = await _unitOfWork.StudentEnrollments.GetActiveCountByClassAsync(
+                    request.NewClassId,
+                    currentEnrollment.AcademicYearId);
+                if (activeCount + result.SuccessCount >= newClass.Capacity.Value)
+                {
+                    result.FailureCount++;
+                    result.Failures.Add(new BulkTransferFailureDto
+                    {
+                        EnrollmentId = enrollmentId,
+                        StudentName = currentEnrollment.Student?.FullName ?? "غير معروف",
+                        Reason = "الفصل الهدف وصل إلى السعة القصوى"
+                    });
+                    continue;
+                }
             }
 
             // Perform transfer

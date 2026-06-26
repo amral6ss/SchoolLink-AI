@@ -29,9 +29,10 @@ public interface IStudentEnrollmentRepository : IRepository<StudentEnrollment>
     Task<int> GetTransfersCountAsync(int academicYearId, CancellationToken ct = default);
 
     /// <summary>
-    /// يجيب الطلاب الغير مسجلين في أي فصل حالياً مع pagination وفلتر وترتيب.
+    /// يجيب الطلاب الغير مسجلين في أي فصل نشط داخل سنة معينة مع pagination وفلتر وترتيب.
     /// </summary>
     Task<(IReadOnlyList<Project.Domain.Entities.Student> Students, int TotalCount)> GetUnenrolledStudentsAsync(
+        int academicYearId,
         string? searchTerm,
         DateOnly? birthDateFrom,
         DateOnly? birthDateTo,
@@ -41,6 +42,5 @@ public interface IStudentEnrollmentRepository : IRepository<StudentEnrollment>
         int pageSize,
         CancellationToken ct = default);
 }
-
 
 

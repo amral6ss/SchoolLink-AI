@@ -34,7 +34,11 @@ public class MappingProfile : Profile
             .ForMember(d => d.GradeLevelName,
                 opt => opt.MapFrom(s => s.GradeLevel.Name))
             .ForMember(d => d.AcademicYearName,
-                opt => opt.MapFrom(s => s.AcademicYear.Name));
+                opt => opt.MapFrom(s => s.AcademicYear.Name))
+            .ForMember(d => d.Status,
+                opt => opt.MapFrom(s => (int)s.Status))
+            .ForMember(d => d.StatusName,
+                opt => opt.MapFrom(s => s.Status.ToString()));
 
         // ClassSubjectTeacher
         CreateMap<ClassSubjectTeacher, ClassSubjectTeacherDto>()
@@ -135,5 +139,6 @@ public class MappingProfile : Profile
                 opt => opt.MapFrom(s => s.Enrollment.Student.FullName))
             .ForMember(d => d.StudentId,
                 opt => opt.MapFrom(s => s.Enrollment.Student.Id));
+
     }
 }

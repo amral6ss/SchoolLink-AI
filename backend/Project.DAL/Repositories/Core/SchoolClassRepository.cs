@@ -87,6 +87,7 @@ public class SchoolClassRepository : Repository<SchoolClass>, ISchoolClassReposi
     public async Task<IReadOnlyList<SchoolClass>> GetFilteredWithIncludesAsync(
         int? academicYearId,
         int? gradeLevelId,
+        int? status,
         CancellationToken ct = default)
     {
         var query = _context.Classes
@@ -100,6 +101,9 @@ public class SchoolClassRepository : Repository<SchoolClass>, ISchoolClassReposi
 
         if (gradeLevelId.HasValue)
             query = query.Where(c => c.GradeLevelId == gradeLevelId.Value);
+
+        if (status.HasValue)
+            query = query.Where(c => (int)c.Status == status.Value);
 
         return await query
             .OrderBy(c => c.GradeLevel.LevelOrder)

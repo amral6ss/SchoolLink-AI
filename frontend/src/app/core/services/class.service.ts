@@ -9,6 +9,35 @@ export interface ClassEntity {
   gradeLevelName?: string;
   academicYearId: number;
   academicYearName?: string;
+  capacity?: number | null;
+  status?: number;
+  statusName?: string;
+}
+
+export interface CopyClassesFromYearRequest {
+  sourceAcademicYearId: number;
+  targetAcademicYearId: number;
+}
+
+export interface CopyClassesFromYearPreviewItem {
+  sourceClassId: number;
+  gradeLevelId: number;
+  gradeLevelName: string;
+  className: string;
+  capacity?: number | null;
+  status: number;
+  alreadyExists: boolean;
+  targetClassId?: number | null;
+  action: string;
+}
+
+export interface CopyClassesFromYearResult {
+  sourceAcademicYearId: number;
+  targetAcademicYearId: number;
+  totalSourceClasses: number;
+  createdCount: number;
+  skippedExistingCount: number;
+  items: CopyClassesFromYearPreviewItem[];
 }
 
 @Injectable({
@@ -54,6 +83,14 @@ export class ClassService {
 
   delete(id: number): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/${id}`);
+  }
+
+  previewCopyFromYear(data: CopyClassesFromYearRequest): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/copy-from-year/preview`, data);
+  }
+
+  copyFromYear(data: CopyClassesFromYearRequest): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/copy-from-year`, data);
   }
 
   getMyClassesCurrentYear(): Observable<any> {

@@ -48,6 +48,9 @@ public class TimetableService : ITimetableService
         if (schoolClass is null || schoolClass.IsDeleted)
             return OperationResult<TimetableDto>.Failure("الفصل غير موجود");
 
+        if (schoolClass.Status != ClassStatus.Active)
+            return OperationResult<TimetableDto>.Failure("لا يمكن إنشاء جدول لفصل غير نشط");
+
         // 2. Validate AcademicYear
         var academicYear = await _unitOfWork.AcademicYears.GetByIdAsync(request.AcademicYearId, ct);
         if (academicYear is null || academicYear.IsDeleted)

@@ -224,12 +224,14 @@ public static class SeedData
         var class1 = new SchoolClass
         {
             GradeLevelId = grade1.Id, AcademicYearId = year.Id,
-            Name = "1/1", CreatedAt = now, UpdatedAt = now
+            Name = "1/1", Capacity = 35, Status = ClassStatus.Active,
+            CreatedAt = now, UpdatedAt = now
         };
         var class2 = new SchoolClass
         {
             GradeLevelId = grade1.Id, AcademicYearId = year.Id,
-            Name = "1/2", CreatedAt = now, UpdatedAt = now
+            Name = "1/2", Capacity = 35, Status = ClassStatus.Active,
+            CreatedAt = now, UpdatedAt = now
         };
         ctx.Classes.AddRange(class1, class2);
         await ctx.SaveChangesAsync();
@@ -240,22 +242,26 @@ public static class SeedData
         var class3 = new SchoolClass
         {
             GradeLevelId = grade2.Id, AcademicYearId = year.Id,
-            Name = "2/1", CreatedAt = now, UpdatedAt = now
+            Name = "2/1", Capacity = 35, Status = ClassStatus.Active,
+            CreatedAt = now, UpdatedAt = now
         };
         var class4 = new SchoolClass
         {
             GradeLevelId = grade2.Id, AcademicYearId = year.Id,
-            Name = "2/2", CreatedAt = now, UpdatedAt = now
+            Name = "2/2", Capacity = 35, Status = ClassStatus.Active,
+            CreatedAt = now, UpdatedAt = now
         };
         var class5 = new SchoolClass
         {
             GradeLevelId = grade3.Id, AcademicYearId = year.Id,
-            Name = "3/1", CreatedAt = now, UpdatedAt = now
+            Name = "3/1", Capacity = 35, Status = ClassStatus.Active,
+            CreatedAt = now, UpdatedAt = now
         };
         var class6 = new SchoolClass
         {
             GradeLevelId = grade3.Id, AcademicYearId = year.Id,
-            Name = "3/2", CreatedAt = now, UpdatedAt = now
+            Name = "3/2", Capacity = 35, Status = ClassStatus.Active,
+            CreatedAt = now, UpdatedAt = now
         };
         ctx.Classes.AddRange(class3, class4, class5, class6);
         await ctx.SaveChangesAsync();
@@ -508,6 +514,7 @@ public static class SeedData
                     Gender    = Gender.Male,
                     BirthDate = new DateOnly(2012, 1 + (seq % 12), 1 + (seq % 28)),
                     IsActive  = true,
+                    LifecycleStatus = StudentLifecycleStatus.Active,
                     CreatedAt = now, UpdatedAt = now
                 };
                 ctx.Students.Add(st);

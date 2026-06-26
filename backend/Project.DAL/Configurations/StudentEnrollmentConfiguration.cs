@@ -19,6 +19,10 @@ namespace Project.DAL.Configurations
             builder.Property(x => x.LeftAt)
                 .HasColumnType("date");
 
+            builder.HasIndex(x => new { x.StudentId, x.AcademicYearId })
+                .IsUnique()
+                .HasFilter("[LeftAt] IS NULL AND [IsDeleted] = 0");
+
             builder.HasOne(x => x.Student)
                 .WithMany(x => x.Enrollments)
                 .HasForeignKey(x => x.StudentId)

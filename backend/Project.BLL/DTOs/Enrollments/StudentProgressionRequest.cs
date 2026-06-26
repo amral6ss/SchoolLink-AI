@@ -20,10 +20,19 @@ public class StudentProgressionRequest
 
     public int? TargetClassId { get; set; }
     public int? TargetAcademicYearId { get; set; }
+    public List<StudentProgressionClassMappingRequest> ClassMappings { get; set; } = new();
 
     [Required]
     public DateOnly EffectiveDate { get; set; }
 
+    public decimal PassingThreshold { get; set; } = 50m;
+
     [MaxLength(500)]
     public string? Note { get; set; }
+}
+
+public class StudentProgressionClassMappingRequest
+{
+    public int SourceClassId { get; set; }
+    public int TargetClassId { get; set; }
 }

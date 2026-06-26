@@ -137,6 +137,9 @@ public class ConversationService : IConversationService
         if (schoolClass == null || schoolClass.IsDeleted)
             return OperationResult<ConversationDto>.Failure("الفصل غير موجود");
 
+        if (schoolClass.Status != ClassStatus.Active)
+            return OperationResult<ConversationDto>.Failure("لا يمكن إنشاء مجموعة لفصل غير نشط");
+
         var cst = await _unitOfWork.ClassSubjectTeachers.GetByClassSubjectAndYearAsync(
             request.ClassId, request.SubjectId, request.AcademicYearId);
 
@@ -198,6 +201,9 @@ public class ConversationService : IConversationService
         var schoolClass = await _unitOfWork.Classes.GetByIdAsync(request.ClassId);
         if (schoolClass == null || schoolClass.IsDeleted)
             return OperationResult<ConversationDto>.Failure("الفصل غير موجود");
+
+        if (schoolClass.Status != ClassStatus.Active)
+            return OperationResult<ConversationDto>.Failure("لا يمكن إنشاء مجموعة لفصل غير نشط");
 
         var enrollments = await _unitOfWork.StudentEnrollments.GetActiveByClassAsync(
             request.ClassId, request.AcademicYearId);

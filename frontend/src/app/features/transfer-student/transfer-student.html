@@ -155,8 +155,8 @@
                     [ngModel]="selectedTargetClassId()"
                     (ngModelChange)="selectedTargetClassId.set($event)">
               <option [ngValue]="null">-- اختر الفصل الهدف --</option>
-              <option *ngFor="let c of availableTargetClasses()" [ngValue]="c.id">{{ c.name }}</option>
-              <option *ngIf="availableTargetClasses().length === 0 && sourceClass()" disabled>لا توجد فصول أخرى في نفس الصف والسنة</option>
+              <option *ngFor="let c of availableTargetClasses()" [ngValue]="c.id">{{ getClassOptionLabel(c) }}</option>
+              <option *ngIf="availableTargetClasses().length === 0 && sourceClass()" disabled>لا توجد فصول نشطة أخرى في نفس الصف والسنة</option>
             </select>
           </div>
 

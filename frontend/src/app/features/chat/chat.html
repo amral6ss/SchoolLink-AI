@@ -667,7 +667,9 @@
             [ngModel]="selectedClassId()" (ngModelChange)="selectedClassId.set($event)">
             <option [ngValue]="null" disabled>اختر الفصل</option>
             @for (cls of classList(); track cls.id) {
-              <option [ngValue]="cls.id">{{ cls.name }}</option>
+              @if (!selectedAcademicYearId() || cls.academicYearId === selectedAcademicYearId()) {
+                <option [ngValue]="cls.id">{{ cls.name }}</option>
+              }
             }
           </select>
         </div>

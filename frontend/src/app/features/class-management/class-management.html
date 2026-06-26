@@ -106,6 +106,32 @@
                 </select>
               </div>
 
+              <div class="cm-field">
+                <label class="cm-label">
+                  <span class="material-symbols-outlined">groups</span>
+                  السعة
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  [(ngModel)]="newClass.capacity"
+                  class="cm-input"
+                  placeholder="اختياري">
+              </div>
+
+              <div class="cm-field">
+                <label class="cm-label">
+                  <span class="material-symbols-outlined">toggle_on</span>
+                  الحالة
+                </label>
+                <select [(ngModel)]="newClass.status" class="cm-select">
+                  <option [ngValue]="1">نشط</option>
+                  <option [ngValue]="2">مغلق</option>
+                  <option [ngValue]="3">مؤرشف</option>
+                </select>
+              </div>
+
               <!-- Actions -->
               <div class="cm-form-h-actions">
                 <button
@@ -122,6 +148,78 @@
                 </button>
               </div>
             </div>
+          </section>
+
+          <section class="cm-card animate-fade-up" style="animation-delay:.04s">
+            <div class="cm-card-header">
+              <h3 class="cm-card-title">
+                <span class="material-symbols-outlined">content_copy</span>
+                نسخ هيكل الفصول من سنة سابقة
+              </h3>
+              <span class="cm-chip">Rollover</span>
+            </div>
+
+            <div class="cm-form cm-form-h">
+              <div class="cm-field">
+                <label class="cm-label">
+                  <span class="material-symbols-outlined">history</span>
+                  السنة المصدر
+                </label>
+                <select [(ngModel)]="copySourceAcademicYearId" class="cm-select">
+                  <option [ngValue]="null">-- اختر السنة المصدر --</option>
+                  <option *ngFor="let y of academicYears()" [ngValue]="y.id">{{ y.name }}</option>
+                </select>
+              </div>
+
+              <div class="cm-field">
+                <label class="cm-label">
+                  <span class="material-symbols-outlined">event_available</span>
+                  السنة الهدف
+                </label>
+                <select [(ngModel)]="copyTargetAcademicYearId" class="cm-select">
+                  <option [ngValue]="null">-- اختر السنة الهدف --</option>
+                  <option *ngFor="let y of academicYears()" [ngValue]="y.id">{{ y.name }}</option>
+                </select>
+              </div>
+
+              <div class="cm-form-h-actions">
+                <button type="button" class="cm-btn cm-btn-ghost cm-btn-sm" [disabled]="copyLoading()" (click)="previewCopyClasses()">
+                  <span class="material-symbols-outlined">visibility</span>
+                  معاينة
+                </button>
+                <button type="button" class="cm-btn cm-btn-primary cm-btn-sm" [disabled]="copyLoading() || !copyPreview()" (click)="executeCopyClasses()">
+                  <span class="material-symbols-outlined">content_copy</span>
+                  تنفيذ النسخ
+                </button>
+              </div>
+            </div>
+
+            @if (copyPreview()) {
+              <div class="cm-table-wrap mt-4">
+                <table class="cm-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">المرحلة</th>
+                      <th scope="col">الفصل</th>
+                      <th scope="col">السعة</th>
+                      <th scope="col">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let item of copyPreview()?.items">
+                      <td>{{ item.gradeLevelName }}</td>
+                      <td>{{ item.className }}</td>
+                      <td>{{ item.capacity || 'غير محددة' }}</td>
+                      <td>
+                        <span class="cm-badge" [class.cm-badge-green]="!item.alreadyExists" [class.cm-badge-gray]="item.alreadyExists">
+                          {{ item.alreadyExists ? 'موجود بالفعل' : 'سيتم إنشاؤه' }}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            }
           </section>
 
           <!-- Data Table — full width -->
@@ -170,6 +268,8 @@
                     <th scope="col">اسم الفصل</th>
                     <th scope="col">المرحلة الدراسية</th>
                     <th scope="col">السنة الدراسية</th>
+                    <th scope="col">السعة</th>
+                    <th scope="col">الحالة</th>
                     <th scope="col" class="text-center">إجراءات</th>
                   </tr>
                 </thead>
@@ -188,6 +288,14 @@
                     </td>
                     <td>
                       <span class="cm-badge cm-badge-gray">{{ cls.academicYearName || cls.academicYearId }}</span>
+                    </td>
+                    <td>{{ cls.capacity || 'غير محددة' }}</td>
+                    <td>
+                      <span class="cm-badge"
+                        [class.cm-badge-green]="(cls.status || 1) === 1"
+                        [class.cm-badge-gray]="(cls.status || 1) !== 1">
+                        {{ getClassStatusLabel(cls.status) }}
+                      </span>
                     </td>
                     <td>
                       <div class="cm-row-actions">
@@ -222,7 +330,7 @@
                   </tr>
 
                   <tr *ngIf="classes().length === 0">
-                    <td colspan="4" class="p-0">
+                      <td colspan="6" class="p-0">
                       <div class="cm-empty">
                         <div class="cm-empty-icon-wrap">
                           <span class="material-symbols-outlined">meeting_room</span>

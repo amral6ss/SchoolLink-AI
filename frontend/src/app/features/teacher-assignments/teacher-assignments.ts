@@ -193,7 +193,9 @@ export class TeacherAssignments implements OnInit {
   onNewGradeChange() {
     this.newAssignment.classId = 0;
     if (this.selectedNewGradeId) {
-      this.formClasses.set(this.classes().filter(c => c.gradeLevelId === this.selectedNewGradeId));
+      this.formClasses.set(this.classes().filter(c =>
+        c.gradeLevelId === this.selectedNewGradeId &&
+        (c.status ?? 1) === 1));
     } else {
       this.formClasses.set([]);
     }

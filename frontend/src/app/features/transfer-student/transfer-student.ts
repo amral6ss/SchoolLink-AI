@@ -87,7 +87,11 @@ export class TransferStudent implements OnInit {
     const sc = this.sourceClass();
     if (!sc) return [];
     return this.allClasses()
-      .filter(c => c.id !== sc.id && c.academicYearId === sc.academicYearId && c.gradeLevelId === sc.gradeLevelId)
+      .filter(c =>
+        c.id !== sc.id &&
+        c.academicYearId === sc.academicYearId &&
+        c.gradeLevelId === sc.gradeLevelId &&
+        (c.status ?? 1) === 1)
       .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   });
 
@@ -100,6 +104,10 @@ export class TransferStudent implements OnInit {
     this.selectedTargetClassId() !== this.selectedSourceClassId() &&
     !this.isTransferring()
   );
+
+  getClassOptionLabel(cls: ClassEntity): string {
+    return cls.capacity ? `${cls.name} - السعة ${cls.capacity}` : cls.name;
+  }
 
   ngOnInit() {
     this.loadPageData();

@@ -1,6 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Project.Domain.Entities;
+using Project.Domain.Enums;
 
 namespace Project.DAL.Configurations
 {
@@ -12,7 +13,12 @@ namespace Project.DAL.Configurations
 
             builder.Property(x => x.Name)
                 .IsRequired()
-                .HasMaxLength(20);
+                .HasMaxLength(100);
+
+            builder.Property(x => x.Capacity);
+
+            builder.Property(x => x.Status)
+                .HasDefaultValue(ClassStatus.Active);
 
             builder.HasIndex(x => new { x.GradeLevelId, x.AcademicYearId, x.Name })
                 .IsUnique()

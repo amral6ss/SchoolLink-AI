@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Project.Domain.Entities;
+using Project.Domain.Enums;
 
 namespace Project.DAL.Configurations
 {
@@ -23,6 +24,9 @@ namespace Project.DAL.Configurations
 
             builder.Property(x => x.BirthDate)
                 .HasColumnType("date");
+
+            builder.Property(x => x.LifecycleStatus)
+                .HasDefaultValue(StudentLifecycleStatus.Active);
 
             builder.HasIndex(x => x.NationalId)
                 .IsUnique()

@@ -3,8 +3,11 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { buildApiUrl } from '../utils/api-url';
 
-export type AcademicStatus = 0 | 1 | 2 | 3; // NoGrades=0, Unpublished=1, Passed=2, Failed=3
-export type AcademicTermLabel = 1 | 2;      // FirstSemester=1, SecondSemester=2
+// الـ backend بيرجع enums كنص (JsonStringEnumConverter في Program.cs)
+// فلازم نقارنها بـ string مش رقم.
+export type AcademicStatus = 'NoGrades' | 'Unpublished' | 'Passed' | 'Failed';
+export type AcademicTermLabel = 'FirstSemester' | 'SecondSemester';
+// ProgressionTermScope ده query param بيُبعت رقم للـ backend، فسيبناها رقم.
 export type ProgressionTermScope = 1 | 2 | 3; // First=1, Second=2, Both=3
 
 export interface SubjectGrade {
@@ -13,6 +16,7 @@ export interface SubjectGrade {
   percentage: number;
   isPublished: boolean;
   isPassed: boolean;
+  // الـ backend بيرجع term كنص ("FirstSemester"/"SecondSemester") بسبب JsonStringEnumConverter
   term?: AcademicTermLabel | null;
 }
 
@@ -27,6 +31,8 @@ export interface StudentProgressionCandidate {
   academicYearId: number;
   academicYearName: string;
   studentIsActive: boolean;
+  studentLifecycleStatus: number;
+  studentLifecycleStatusName: string;
   hasStudentAccount: boolean;
   hasFinalGrade: boolean;
   finalTotal?: number | null;
@@ -42,8 +48,15 @@ export interface StudentProgressionRequest {
   action: 1 | 2 | 3;
   targetClassId?: number | null;
   targetAcademicYearId?: number | null;
+  classMappings?: StudentProgressionClassMapping[];
   effectiveDate: string;
+  passingThreshold?: number;
   note?: string;
+}
+
+export interface StudentProgressionClassMapping {
+  sourceClassId: number;
+  targetClassId: number;
 }
 
 export interface StudentProgressionFailure {

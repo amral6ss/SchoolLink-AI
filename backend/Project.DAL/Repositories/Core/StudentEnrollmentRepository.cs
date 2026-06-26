@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Project.DAL.Interfaces.Repositories.Core;
 using Project.Domain.Entities;
 using Project.DAL.Context;
+using Project.Domain.Enums;
 
 namespace Project.DAL.Repositories.Core;
 
@@ -74,6 +75,7 @@ public class StudentEnrollmentRepository : Repository<StudentEnrollment>, IStude
                 e.Student != null &&
                 !e.Student.IsDeleted &&
                 e.Student.IsActive &&
+                e.Student.LifecycleStatus == StudentLifecycleStatus.Active &&
                 e.Class.GradeLevelId == gradeLevelId &&
                 !e.Class.IsDeleted)
             .Include(e => e.Student)
@@ -214,6 +216,7 @@ public class StudentEnrollmentRepository : Repository<StudentEnrollment>, IStude
                 e.LeftAt != null, ct);
 
     public async Task<(IReadOnlyList<Domain.Entities.Student> Students, int TotalCount)> GetUnenrolledStudentsAsync(
+        int academicYearId,
         string? searchTerm,
         DateOnly? birthDateFrom,
         DateOnly? birthDateTo,
@@ -227,8 +230,10 @@ public class StudentEnrollmentRepository : Repository<StudentEnrollment>, IStude
             .Where(s =>
                 !s.IsDeleted &&
                 s.IsActive &&
+                s.LifecycleStatus == StudentLifecycleStatus.Active &&
                 !_context.StudentEnrollments.Any(e =>
                     e.StudentId == s.Id &&
+                    e.AcademicYearId == academicYearId &&
                     e.LeftAt == null &&
                     !e.IsDeleted))
             .AsQueryable();
