@@ -492,8 +492,6 @@ public class StudentProgressionService : IStudentProgressionService
             TotalRequested = enrollmentIds.Count
         };
 
-        var deactivatedStudents = new HashSet<string>(StringComparer.Ordinal);
-        var deactivatedParents = new HashSet<string>(StringComparer.Ordinal);
         var orderedSummaries = selectedEnrollments
             .OrderBy(e => e.Student.FullName)
             .ToList();
@@ -689,51 +687,11 @@ public class StudentProgressionService : IStudentProgressionService
             }
         }
 
-        result.DeactivatedStudents = deactivatedStudents.OrderBy(name => name).ToList();
-        result.DeactivatedParents = deactivatedParents.OrderBy(name => name).ToList();
         result.FailureCount = result.Failures.Count;
 
         return OperationResult<StudentProgressionResultDto>.Success(
             result,
             BuildResultMessage(result));
-    }
-
-    private async Task DeactivateParentAccountsIfNeededAsync(
-        int graduatingStudentId,
-        HashSet<string> deactivatedParents,
-        CancellationToken ct)
-    {
-        var parentLinks = await _unitOfWork.ParentStudents.GetWithParentDetailsByStudentAsync(graduatingStudentId, ct);
-        foreach (var link in parentLinks.Where(link => !link.IsDeleted))
-        {
-            var parent = link.Parent;
-            if (parent.IsDeleted || !parent.IsActive)
-                continue;
-
-            var hasOtherActiveChildren = await ParentHasOtherActiveChildrenAsync(parent.Id, graduatingStudentId, ct);
-            if (hasOtherActiveChildren)
-                continue;
-
-            parent.IsActive = false;
-            parent.UpdatedAt = DateTime.UtcNow;
-            _unitOfWork.Users.Update(parent);
-            await _unitOfWork.RefreshTokens.RevokeAllForUserAsync(parent.Id, ct);
-            deactivatedParents.Add(parent.FullName);
-        }
-    }
-
-    private async Task<bool> ParentHasOtherActiveChildrenAsync(
-        int parentId,
-        int excludingStudentId,
-        CancellationToken ct)
-    {
-        var siblings = await _unitOfWork.ParentStudents.GetByParentIdAsync(parentId, ct);
-        return siblings.Any(link =>
-            !link.IsDeleted &&
-            link.StudentId != excludingStudentId &&
-            link.Student is not null &&
-            !link.Student.IsDeleted &&
-            link.Student.IsActive);
     }
 
     private async Task AddFailureAndRollbackAsync(

@@ -74,8 +74,6 @@ export interface StudentProgressionResult {
   graduatedCount: number;
   failureCount: number;
   failures: StudentProgressionFailure[];
-  deactivatedStudents: string[];
-  deactivatedParents: string[];
 }
 
 @Injectable({

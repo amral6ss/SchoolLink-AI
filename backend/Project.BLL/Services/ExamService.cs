@@ -547,7 +547,8 @@ namespace Project.BLL.Services
                 var enrollments = await _unitOfWork.StudentEnrollments
                     .GetActiveByClassAsync(cst.ClassId, cst.AcademicYearId);
                 studentIds = enrollments
-                    .Where(e => e.Student != null && e.Student.UserId != null && e.Student.IsActive)
+                    .Where(e => e.Student != null && e.Student.UserId != null && e.Student.IsActive
+                        && e.Student.LifecycleStatus == StudentLifecycleStatus.Active)
                     .Select(e => e.Student.UserId!.Value)
                     .Distinct()
                     .ToList();
@@ -558,7 +559,8 @@ namespace Project.BLL.Services
                 var enrollments = await _unitOfWork.StudentEnrollments
                     .GetActiveByGradeLevelAndYearWithDetailsAsync(exam.GradeLevelId, currentYear.Id);
                 studentIds = enrollments
-                    .Where(e => e.Student != null && e.Student.UserId != null && e.Student.IsActive)
+                    .Where(e => e.Student != null && e.Student.UserId != null && e.Student.IsActive
+                        && e.Student.LifecycleStatus == StudentLifecycleStatus.Active)
                     .Select(e => e.Student.UserId!.Value)
                     .Distinct()
                     .ToList();

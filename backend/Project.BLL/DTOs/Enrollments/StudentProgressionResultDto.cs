@@ -9,8 +9,6 @@ public class StudentProgressionResultDto
     public int GraduatedCount { get; set; }
     public int FailureCount { get; set; }
     public List<StudentProgressionFailureDto> Failures { get; set; } = new();
-    public List<string> DeactivatedStudents { get; set; } = new();
-    public List<string> DeactivatedParents { get; set; } = new();
 }
 
 public class StudentProgressionFailureDto

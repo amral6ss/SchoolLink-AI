@@ -107,7 +107,12 @@ public class StudentService : IStudentService
         }
 
         if (filter.IsActive.HasValue)
-            students = students.Where(s => s.IsActive == filter.IsActive.Value).ToList();
+        {
+            if (filter.IsActive.Value)
+                students = students.Where(s => s.IsActive && s.LifecycleStatus == StudentLifecycleStatus.Active).ToList();
+            else
+                students = students.Where(s => !s.IsActive || s.LifecycleStatus != StudentLifecycleStatus.Active).ToList();
+        }
 
         var dtos = _mapper.Map<IEnumerable<StudentDto>>(students);
         return OperationResult<IEnumerable<StudentDto>>.Success(dtos);

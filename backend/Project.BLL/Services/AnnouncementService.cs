@@ -305,7 +305,8 @@ public class AnnouncementService : IAnnouncementService
             {
                 if (request.IsForAllStudents)
                 {
-                    var students = await _unitOfWork.Students.FindAsync(s => s.IsActive && !s.IsDeleted);
+                    var students = await _unitOfWork.Students.FindAsync(s => s.IsActive && !s.IsDeleted
+                        && s.LifecycleStatus == StudentLifecycleStatus.Active);
                     recipients.AddRange(students.Where(s => s.UserId != null).Select(s => s.UserId!.Value));
                 }
                 if (request.IsForAllParents)

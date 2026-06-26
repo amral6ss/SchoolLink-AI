@@ -93,7 +93,7 @@ public class ParentStudentService : IParentStudentService
                     StudentName = l.Student.FullName,
                     ClassName = activeEnrollment?.Class?.Name,
                     GradeLevelName = activeEnrollment?.Class?.GradeLevel?.Name,
-                    IsActive = l.Student.IsActive,
+                    IsActive = activeEnrollment != null && l.Student.LifecycleStatus == StudentLifecycleStatus.Active,
                     Relationship = l.Relationship
                 };
             })

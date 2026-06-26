@@ -674,8 +674,10 @@ public class ExamManagerService : IExamManagerService
             return await _context.StudentEnrollments
                 .Where(e => e.ClassId == cst.ClassId
                          && e.AcademicYearId == cst.AcademicYearId
+                         && e.LeftAt == null
                          && !e.IsDeleted
-                         && e.Student != null && e.Student.UserId != null && e.Student.IsActive)
+                         && e.Student != null && e.Student.UserId != null && e.Student.IsActive
+                         && e.Student.LifecycleStatus == StudentLifecycleStatus.Active)
                 .Select(e => e.Student.UserId!.Value)
                 .Distinct()
                 .ToListAsync();
@@ -684,8 +686,10 @@ public class ExamManagerService : IExamManagerService
         // Grade-level exam (no specific CST)
         return await _context.StudentEnrollments
             .Where(e => e.Class.GradeLevelId == exam.GradeLevelId
+                     && e.LeftAt == null
                      && !e.IsDeleted
-                     && e.Student != null && e.Student.UserId != null && e.Student.IsActive)
+                     && e.Student != null && e.Student.UserId != null && e.Student.IsActive
+                     && e.Student.LifecycleStatus == StudentLifecycleStatus.Active)
             .Select(e => e.Student.UserId!.Value)
             .Distinct()
             .ToListAsync();

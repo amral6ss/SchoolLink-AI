@@ -2,6 +2,7 @@
 using Project.DAL.Interfaces.Repositories.Core;
 using Project.Domain.Entities;
 using Project.DAL.Context;
+using Project.Domain.Enums;
 
 namespace Project.DAL.Repositories.Core;
 
@@ -40,7 +41,7 @@ public class StudentRepository : Repository<Student>, IStudentRepository
     public async Task<IReadOnlyList<Student>> GetActiveStudentsAsync(
         CancellationToken ct = default)
         => await _context.Students
-            .Where(s => s.IsActive)
+            .Where(s => s.IsActive && s.LifecycleStatus == StudentLifecycleStatus.Active)
             .OrderBy(s => s.FullName)
             .ToListAsync(ct);
 
@@ -71,7 +72,8 @@ public class StudentRepository : Repository<Student>, IStudentRepository
     public async Task<IReadOnlyList<Student>> GetWithoutUserAccountAsync(
         CancellationToken ct = default)
         => await _context.Students
-            .Where(s => s.UserId == null && s.IsActive)
+            .Where(s => s.UserId == null && s.IsActive
+                        && s.LifecycleStatus == StudentLifecycleStatus.Active)
             .OrderBy(s => s.FullName)
             .ToListAsync(ct);
 }
