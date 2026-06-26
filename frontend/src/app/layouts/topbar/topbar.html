@@ -89,15 +89,12 @@
 
 <!-- Bottom Navigation (mobile) -->
 <nav class="bottom-nav">
-  @let h = navItems().home;
   @let c = navItems().chat;
   @let n = navItems().notif;
 
-  <button class="nav-item"
-     [class.active]="h && router.isActive(h.route, false)"
-     (click)="navigate(h?.route || '/')">
-    <span class="material-symbols-outlined">{{ h?.icon || 'dashboard' }}</span>
-    <span>الرئيسية</span>
+  <button class="nav-item" (click)="toggleSidebar()">
+    <span class="material-symbols-outlined">menu</span>
+    <span>القائمة</span>
   </button>
 
   <button class="nav-item"

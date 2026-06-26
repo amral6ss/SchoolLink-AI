@@ -36,6 +36,10 @@ export class Topbar implements OnInit {
   notificationCount = input(0);
   searchOpen = signal(false);
 
+  toggleSidebar() {
+    document.getElementById('menuToggle')?.click();
+  }
+
   profilePictureUrl = signal<string | null>(null);
   isLoadingAvatar = signal(false);
 

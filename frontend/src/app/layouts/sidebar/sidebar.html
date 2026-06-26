@@ -40,9 +40,7 @@
   </div>
 </aside>
 
-<button id="menuToggle" (click)="toggle()">
-  <span class="material-symbols-outlined">menu</span>
-</button>
+<button id="menuToggle" type="button" (click)="toggle()" style="display:none"></button>
 
 @if (isOpen()) {
   <div id="sidebarOverlay" class="show" (click)="toggle()"></div>
