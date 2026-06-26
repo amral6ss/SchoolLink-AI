@@ -77,6 +77,10 @@ public interface IUnitOfWork : IDisposable, IAsyncDisposable
     ISchoolProfileRepository               SchoolProfiles               { get; }
     IRepository<AIReport>                  AIReports                    { get; }
 
+    // Section H: Certificates
+    IRepository<Certificate>               Certificates                 { get; }
+    IRepository<CertificateSubject>        CertificateSubjects          { get; }
+
     // Section H: Timetable
     IRoomRepository                        Rooms                        { get; }
     ITimetableRepository                   Timetables                   { get; }

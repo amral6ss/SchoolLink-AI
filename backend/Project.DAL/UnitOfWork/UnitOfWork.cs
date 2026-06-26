@@ -92,7 +92,12 @@ public class UnitOfWork : IUnitOfWork
         IRepository<ExamQuestionBankItem>      examQuestionBankItems,
 
         // AI Reports
-        IRepository<AIReport>                  aiReports)
+        IRepository<AIReport>                  aiReports,
+
+        // Certificates
+        IRepository<Certificate>               certificates,
+        IRepository<CertificateSubject>        certificateSubjects
+        )
     {
         _context = context;
 
@@ -172,6 +177,10 @@ public class UnitOfWork : IUnitOfWork
 
         // AI Reports
         AIReports                    = aiReports;
+
+        // Certificates
+        Certificates                 = certificates;
+        CertificateSubjects          = certificateSubjects;
     }
 
     public IRepository<ClassTemplateLink>         ClassTemplateLinks           { get; }
@@ -235,6 +244,10 @@ public class UnitOfWork : IUnitOfWork
     public IResultVisibilitySettingRepository     ResultVisibilitySettings     { get; }
     public IAIGenerationLogRepository             AIGenerationLogs             { get; }
     public ISchoolProfileRepository               SchoolProfiles               { get; }
+
+    // Section H: Certificates
+    public IRepository<Certificate>               Certificates                 { get; }
+    public IRepository<CertificateSubject>        CertificateSubjects          { get; }
 
     // Section H: Timetable
     public IRoomRepository                        Rooms                        { get; }
