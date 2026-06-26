@@ -13,6 +13,9 @@ import {
 } from './exam-manager.service';
 import { AcademicYearService } from '../../core/services/academic-year.service';
 import { GradeLevelService } from '../../core/services/grade-level.service';
+import {
+  QuestionBankService, QuestionBankItemDto, SearchQuestionBankDto
+} from '../../core/services/question-bank.service';
 
 @Component({
   selector: 'app-exam-management',
@@ -25,6 +28,7 @@ export class ExamManagement implements OnInit, OnDestroy {
   private api = inject(ExamManagerService);
   private academicYearSvc = inject(AcademicYearService);
   private gradeLevelSvc = inject(GradeLevelService);
+  private qbSvc = inject(QuestionBankService);
   private destroy$ = new Subject<void>();
 
   // ── Academic Year ─────────────────────────────────────────────
@@ -86,6 +90,30 @@ export class ExamManagement implements OnInit, OnDestroy {
   draftQuestions = signal<ExamDraftQuestion[]>([]);
   private _draftCounter = 0;
 
+  // ── Question Bank picker (داخل مودال الإنشاء/التعديل) ─────────
+  showBankPanel = signal(false);
+  bankLoading = signal(false);
+  bankQuestions = signal<QuestionBankItemDto[]>([]);
+  bankSearchText = signal('');
+  bankSelectedType = signal<number | null>(null);
+  bankSelectedIds = signal<Set<number>>(new Set());
+  bankTotalCount = signal(0);
+  bankPage = signal(1);
+  bankPageSize = signal(10);
+  bankTotalPages = computed(() => Math.max(1, Math.ceil(this.bankTotalCount() / this.bankPageSize())));
+  private bankSearchSubject = new Subject<string>();
+
+  readonly BANK_QUESTION_TYPES = [
+    { value: null, label: 'كل الأنواع' },
+    { value: 1, label: 'اختيار من متعدد' },
+    { value: 2, label: 'صح/خطأ' },
+    { value: 3, label: 'أكمل الفراغ' },
+    { value: 4, label: 'مقالي' },
+  ];
+
+  /** هل الفورم جاهز لاستخدام البنك؟ لازم مادة + صف دراسي يكونوا مختارين */
+  canUseBank = computed(() => !!(this.newSubjectId() && this.newGradeLevelId()));
+
   // ── Data ──────────────────────────────────────────────────────
   exams    = signal<ExamItem[]>([]);
   stats    = signal<ExamStats>({ total: 0, upcoming: 0, ended: 0, avgScore: 0 });
@@ -137,6 +165,16 @@ export class ExamManagement implements OnInit, OnDestroy {
     ).subscribe(() => {
       this.page.set(1);
       this.loadExams();
+    });
+
+    // Debounced search داخل بانل بنك الأسئلة
+    this.bankSearchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      takeUntil(this.destroy$)
+    ).subscribe(() => {
+      this.bankPage.set(1);
+      this.searchBank();
     });
 
     this.loadAll();
@@ -370,6 +408,7 @@ export class ExamManagement implements OnInit, OnDestroy {
     this.aiGradingLoading.set(false);
     this.formError.set('');
     this.draftQuestions.set([]);
+    this.resetBankPanel();
   }
 
   saveExam() {
@@ -569,6 +608,177 @@ export class ExamManagement implements OnInit, OnDestroy {
     this.draftQuestions.update(qs =>
       qs.map(q => q._localId === localId ? { ...q, points: pts } : q)
     );
+  }
+
+  // ── Question Bank picker ─────────────────────────────────────
+
+  /** تحويل نوع سؤال البنك (رقمي) إلى نوع الـ draft (string) */
+  private bankTypeToDraft(n: number): ExamDraftQuestion['type'] {
+    switch (n) {
+      case 1: return 'mcq';
+      case 2: return 'true-false';
+      case 3: return 'fill-blank';
+      case 4: return 'essay';
+      default: return 'mcq';
+    }
+  }
+
+  /** تحويل سؤال من بنك الأسئلة إلى صيغة الـ draft المستخدمة في الامتحان */
+  private toDraftQuestion(b: QuestionBankItemDto): ExamDraftQuestion {
+    const type = this.bankTypeToDraft(b.questionType);
+    let options: string[] = [];
+    let correctAnswer = '';
+
+    if (type === 'mcq') {
+      // رجّع نصوص الخيارات من البنك، وأضمن على الأقل 2 خيارات (حتى لو فاضية)
+      // عشان الـ UI للـ MCQ يعرض خانات الإدخال دايماً.
+      const bankOptions = (b.options || []).map(o => o.optionText.trim()).filter(t => t.length > 0);
+      options = bankOptions.length >= 2 ? bankOptions : ['', '', '', ''];
+
+      // الإجابة الصحيحة: الأول من الخيار المعلّم isCorrect، وإلا من correctAnswer.
+      let answer = (b.options || []).find(o => o.isCorrect)?.optionText.trim() ?? '';
+      if (!answer) answer = (b.correctAnswer ?? '').trim();
+
+      // أتأكد إن الإجابة الصحيحة موجودة فعلاً بين الخيارات، وإلا امسحها
+      // (تجنّب وجود correctAnswer لا يطابق أي خيار — يبقى الـ radio محدد على...
+      //  شيء غير موجود).
+      correctAnswer = answer && options.includes(answer) ? answer : '';
+    } else if (type === 'true-false') {
+      options = ['صواب', 'خطأ'];
+      correctAnswer = (b.correctAnswer ?? '').toLowerCase() === 'true' ? 'صواب' : 'خطأ';
+    } else {
+      // fill-blank / essay
+      correctAnswer = b.correctAnswer ?? '';
+    }
+
+    return {
+      _localId: ++this._draftCounter,
+      type,
+      text: b.questionText,
+      options,
+      correctAnswer,
+      points: 10, // افتراضي — المدرس يقدر يعدّله
+    };
+  }
+
+  /** فتح بانل بنك الأسئلة (لازم المادة والصف يكونوا مختارين) */
+  openBankPanel() {
+    if (!this.canUseBank()) {
+      this.formError.set('اختر المادة والصف الدراسي أولاً قبل الإضافة من بنك الأسئلة');
+      return;
+    }
+    this.formError.set('');
+    this.showBankPanel.set(true);
+    this.bankSearchText.set('');
+    this.bankSelectedType.set(null);
+    this.bankSelectedIds.set(new Set());
+    this.bankPage.set(1);
+    this.searchBank();
+  }
+
+  /** إغلاق بانل البنك وإعادة ضبط حالته */
+  closeBankPanel() {
+    this.showBankPanel.set(false);
+    this.resetBankPanel();
+  }
+
+  private resetBankPanel() {
+    this.bankQuestions.set([]);
+    this.bankSearchText.set('');
+    this.bankSelectedType.set(null);
+    this.bankSelectedIds.set(new Set());
+    this.bankPage.set(1);
+    this.bankTotalCount.set(0);
+    this.bankLoading.set(false);
+  }
+
+  onBankSearchInput(value: string) {
+    this.bankSearchText.set(value);
+    this.bankSearchSubject.next(value);
+  }
+
+  onBankTypeChange(value: number | null) {
+    this.bankSelectedType.set(value);
+    this.bankPage.set(1);
+    this.searchBank();
+  }
+
+  /** بحث في بنك الأسئلة بالفلاتر الحالية (مفلتر بالمادة والصف المختارين في الفورم) */
+  searchBank() {
+    const subjectId = this.newSubjectId();
+    const gradeLevelId = this.newGradeLevelId();
+    if (!subjectId || !gradeLevelId) return;
+
+    this.bankLoading.set(true);
+    const dto: SearchQuestionBankDto = {
+      searchText: this.bankSearchText() || undefined,
+      subjectId,
+      gradeLevelId,
+      questionType: this.bankSelectedType() ?? undefined,
+      page: this.bankPage(),
+      pageSize: this.bankPageSize(),
+    };
+
+    this.qbSvc.search(dto).subscribe({
+      next: (res: any) => {
+        const data = res?.data;
+        this.bankQuestions.set(data?.items || []);
+        this.bankTotalCount.set(data?.totalCount || 0);
+        this.bankLoading.set(false);
+      },
+      error: () => {
+        this.bankLoading.set(false);
+        this.bankQuestions.set([]);
+        this.bankTotalCount.set(0);
+      },
+    });
+  }
+
+  bankGoToPage(p: number) {
+    if (p < 1 || p > this.bankTotalPages()) return;
+    this.bankPage.set(p);
+    this.searchBank();
+  }
+
+  bankPageNumbers(): number[] {
+    const total = this.bankTotalPages();
+    const current = this.bankPage();
+    const pages: number[] = [];
+    const start = Math.max(1, current - 2);
+    const end = Math.min(total, current + 2);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  }
+
+  toggleBankSelection(id: number) {
+    this.bankSelectedIds.update(set => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  isBankSelected(id: number): boolean {
+    return this.bankSelectedIds().has(id);
+  }
+
+  /** تحويل الأسئلة المختارة من البنك إلى أسئلة draft وإضافتها للامتحان */
+  addSelectedFromBank() {
+    const selected = this.bankQuestions().filter(q => this.bankSelectedIds().has(q.id));
+    if (selected.length === 0) return;
+
+    const drafts = selected.map(q => this.toDraftQuestion(q));
+    this.draftQuestions.update(list => [...list, ...drafts]);
+
+    this.bankSelectedIds.set(new Set());
+    this.closeBankPanel();
+  }
+
+  /** اسم نوع سؤال البنك للعرض */
+  bankQTypeName(v: number): string {
+    const found = this.BANK_QUESTION_TYPES.find(t => t.value === v);
+    return found?.label ?? '';
   }
 
   // ── Results / Grading ─────────────────────────────────────────

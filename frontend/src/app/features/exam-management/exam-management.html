@@ -406,11 +406,19 @@
 
         <!-- Questions Section -->
         <div class="flex flex-col gap-3">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between flex-wrap gap-2">
             <h3 class="font-headline-sm text-headline-sm" style="font-weight:700;">الأسئلة ({{ draftQuestions().length }})</h3>
-            <button type="button" class="gradient-btn text-sm px-3 py-1.5" (click)="addQuestion()">
-              <span class="material-symbols-outlined text-[16px]">add</span> سؤال جديد
-            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button type="button" class="secondary-btn-glass text-sm px-3 py-1.5"
+                [class.opacity-50]="!canUseBank()" [class.cursor-not-allowed]="!canUseBank()"
+                (click)="openBankPanel()" [disabled]="!canUseBank()"
+                title="{{ canUseBank() ? 'إضافة أسئلة من بنك الأسئلة' : 'اختر المادة والصف أولاً' }}">
+                <span class="material-symbols-outlined text-[16px]">library_books</span> من بنك الأسئلة
+              </button>
+              <button type="button" class="gradient-btn text-sm px-3 py-1.5" (click)="addQuestion()">
+                <span class="material-symbols-outlined text-[16px]">add</span> سؤال جديد
+              </button>
+            </div>
           </div>
           @for (q of draftQuestions(); track q._localId) {
             <div class="border border-white/40 bg-white/30 backdrop-blur-sm rounded-2xl p-4 flex flex-col gap-3">
@@ -465,6 +473,106 @@
                 <input class="glass-input mt-2" placeholder="الكلمة/الإجابة الصحيحة في الفراغ (مطلوب)..."
                   [value]="q.correctAnswer" (input)="updateQuestionAnswer(q._localId, $any($event.target).value)" />
               }
+            </div>
+          }
+
+          <!-- Question Bank Picker Panel -->
+          @if (showBankPanel()) {
+            <div class="bank-panel border border-white/40 bg-white/40 backdrop-blur-sm rounded-2xl overflow-hidden">
+              <!-- Panel Header -->
+              <div class="flex items-center justify-between gap-2 px-4 py-3 bg-primary/5 border-b border-white/40">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-primary">library_books</span>
+                  <h4 class="font-label-md text-label-md" style="font-weight:700;">اختر من بنك الأسئلة</h4>
+                </div>
+                <button type="button" class="p-1.5 rounded-lg hover:bg-black/5 transition-colors" (click)="closeBankPanel()">
+                  <span class="material-symbols-outlined text-outline text-[20px]">close</span>
+                </button>
+              </div>
+
+              <!-- Filters -->
+              <div class="flex items-center gap-2 flex-wrap px-4 py-3 border-b border-white/30">
+                <div class="relative flex-1 min-w-[180px]">
+                  <span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+                  <input class="glass-input w-full text-sm pr-8" type="text" placeholder="بحث في نص السؤال..."
+                    [ngModel]="bankSearchText()" (ngModelChange)="onBankSearchInput($event)" />
+                </div>
+                <select class="glass-select text-sm" [ngModel]="bankSelectedType()" (ngModelChange)="onBankTypeChange($event)">
+                  @for (t of BANK_QUESTION_TYPES; track t.value) {
+                    <option [ngValue]="t.value">{{ t.label }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Results -->
+              <div class="bank-panel-body px-4 py-3">
+                @if (bankLoading()) {
+                  <div class="flex flex-col items-center justify-center py-8 gap-2">
+                    <span class="spinner" style="width:28px;height:28px"></span>
+                    <p class="text-outline text-sm">جاري التحميل...</p>
+                  </div>
+                } @else if (bankQuestions().length === 0) {
+                  <div class="flex flex-col items-center justify-center py-8 gap-2 text-outline">
+                    <span class="material-symbols-outlined text-[40px]">search_off</span>
+                    <p class="text-sm">لا توجد أسئلة مطابقة في البنك لهذه المادة والصف</p>
+                  </div>
+                } @else {
+                  <div class="flex flex-col gap-2">
+                    @for (q of bankQuestions(); track q.id) {
+                      <label class="bank-item flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors"
+                        [class.border-primary]="isBankSelected(q.id)"
+                        [ngClass]="{ 'bg-primary/10': isBankSelected(q.id), 'border-white/40': !isBankSelected(q.id) }">
+                        <input type="checkbox" class="accent-primary mt-1"
+                          [checked]="isBankSelected(q.id)" (change)="toggleBankSelection(q.id)" />
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <span class="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">{{ bankQTypeName(q.questionType) }}</span>
+                            <span class="text-[11px] text-outline">{{ q.usageCount }} استخدام</span>
+                          </div>
+                          <p class="text-sm break-words">{{ q.questionText }}</p>
+                          @if (q.questionType === 1 && q.options.length) {
+                            <div class="mt-1.5 flex flex-col gap-1">
+                              @for (opt of q.options; track opt.displayOrder) {
+                                <span class="text-xs flex items-center gap-1" [class.text-primary]="opt.isCorrect" [class.font-bold]="opt.isCorrect">
+                                  <span class="material-symbols-outlined text-[14px]" style="{{ opt.isCorrect ? 'color:currentColor' : '' }}">{{ opt.isCorrect ? 'check_circle' : 'radio_button_unchecked' }}</span>
+                                  {{ opt.optionText }}
+                                </span>
+                              }
+                            </div>
+                          }
+                        </div>
+                      </label>
+                    }
+                  </div>
+
+                  <!-- Pagination -->
+                  @if (bankTotalPages() > 1) {
+                    <div class="flex items-center justify-center gap-1 mt-3 flex-wrap">
+                      <button type="button" class="bank-page-btn" (click)="bankGoToPage(bankPage() - 1)" [disabled]="bankPage() <= 1">
+                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                      </button>
+                      @for (p of bankPageNumbers(); track p) {
+                        <button type="button" class="bank-page-btn" [class.bg-primary]="p === bankPage()" [class.text-on-primary]="p === bankPage()"
+                          (click)="bankGoToPage(p)">{{ p }}</button>
+                      }
+                      <button type="button" class="bank-page-btn" (click)="bankGoToPage(bankPage() + 1)" [disabled]="bankPage() >= bankTotalPages()">
+                        <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+                      </button>
+                    </div>
+                  }
+                }
+              </div>
+
+              <!-- Footer -->
+              <div class="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/40 bg-white/20">
+                <span class="text-sm text-outline">{{ bankSelectedIds().size }} سؤال محدد</span>
+                <div class="flex items-center gap-2">
+                  <button type="button" class="secondary-btn-glass text-sm" (click)="closeBankPanel()">إلغاء</button>
+                  <button type="button" class="gradient-btn text-sm" (click)="addSelectedFromBank()" [disabled]="bankSelectedIds().size === 0">
+                    <span class="material-symbols-outlined text-[16px]">add</span> إضافة المحدد
+                  </button>
+                </div>
+              </div>
             </div>
           }
         </div>

@@ -746,3 +746,66 @@
 
   .pagination-bar { flex-direction: column; align-items: center; }
 }
+
+/* ── Question Bank Picker Panel ──────────────────────────────── */
+
+.bank-panel {
+  margin-top: 4px;
+}
+
+.bank-panel-body {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+/* scrollbar خفيف للبنل */
+.bank-panel-body::-webkit-scrollbar {
+  width: 6px;
+}
+.bank-panel-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+.bank-panel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bank-item {
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.bank-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* أزرار التصفح داخل بانل البنك */
+.bank-page-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.bank-page-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+.bank-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* استجابة للشاشات الصغيرة */
+@media (max-width: 640px) {
+  .bank-panel-body {
+    max-height: 50vh;
+  }
+}
