@@ -108,6 +108,7 @@ public static class ServiceExtensions
         services.AddScoped<ITeacherDashboardService, TeacherDashboardService>();
         services.AddScoped<IClassAnalysisService, ClassAnalysisService>();
         services.AddScoped<ILessonFeedbackService, LessonFeedbackService>();
+        services.AddScoped<IHistoricalDataService, HistoricalDataService>();
         services.AddScoped<ICertificateService, CertificateService>();
         services.AddScoped<IUnitService, UnitService>();
         services.AddScoped<WhisperTranscriptionService>();

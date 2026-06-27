@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Project.DAL.Interfaces.Repositories.Learning;
 using Project.Domain.Entities;
 using Project.DAL.Context;
@@ -64,7 +64,7 @@ public class StudentExamAttemptRepository
         => await _context.StudentExamAttempts
             .Where(a => a.EnrollmentId == enrollmentId)
             .Include(a => a.Exam)
-                .ThenInclude(e => e.ClassSubjectTeacher)
+                .ThenInclude(e => e.ClassSubjectTeacher!)
                     .ThenInclude(cst => cst.Subject)
             .OrderByDescending(a => a.StartedAt)
             .ToListAsync(ct);
@@ -154,7 +154,7 @@ public class StudentExamAttemptRepository
             .Include(a => a.Exam)
                 .ThenInclude(e => e.GradeLevel)
             .Include(a => a.Exam)
-                .ThenInclude(e => e.ClassSubjectTeacher)
+                .ThenInclude(e => e.ClassSubjectTeacher!)
                     .ThenInclude(cst => cst.Subject)
             .FirstOrDefaultAsync(a => a.Id == attemptId && a.EnrollmentId == enrollmentId, ct);
 

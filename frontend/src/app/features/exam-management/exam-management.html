@@ -534,7 +534,7 @@
                             <div class="mt-1.5 flex flex-col gap-1">
                               @for (opt of q.options; track opt.displayOrder) {
                                 <span class="text-xs flex items-center gap-1" [class.text-primary]="opt.isCorrect" [class.font-bold]="opt.isCorrect">
-                                  <span class="material-symbols-outlined text-[14px]" style="{{ opt.isCorrect ? 'color:currentColor' : '' }}">{{ opt.isCorrect ? 'check_circle' : 'radio_button_unchecked' }}</span>
+                                  <span class="material-symbols-outlined text-[14px]" [style.color]="opt.isCorrect ? 'currentColor' : ''">{{ opt.isCorrect ? 'check_circle' : 'radio_button_unchecked' }}</span>
                                   {{ opt.optionText }}
                                 </span>
                               }

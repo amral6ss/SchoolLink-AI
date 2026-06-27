@@ -40,6 +40,7 @@ export const ADMIN_MENU: SidebarMenuSection[] = [
     items: [
       { label: 'التقارير الأكاديمية', icon: 'auto_awesome',   route: '/reports-academic' },
       { label: 'التقارير التدريبية',  icon: 'model_training', route: '/reports-training' },
+      { label: 'البيانات التاريخية',   icon: 'history',       route: '/historical-data' },
     ],
   },
   {
@@ -106,6 +107,7 @@ export const TEACHER_MENU: SidebarMenuSection[] = [
     title: 'التقارير',
     items: [
       { label: 'التقارير التدريبية', icon: 'model_training', route: '/reports-training' },
+      { label: 'البيانات التاريخية',   icon: 'history',       route: '/historical-data' },
     ],
   },
   {
@@ -134,6 +136,7 @@ export const PARENT_MENU: SidebarMenuSection[] = [
       { label: 'جداول الأبناء', icon: 'calendar_month',   route: '/parent-schedule'},
       { label: 'متابعة ابني',   icon: 'supervisor_account',route: '/child-progress' },
       { label: 'التقارير',      icon: 'description',       route: '/reports'        },
+      { label: 'البيانات التاريخية',   icon: 'history',       route: '/historical-data' },
       { label: 'طلب اجتماع',   icon: 'meeting_room',      route: '/parent-meeting-request' },
     ],
   },
@@ -164,6 +167,7 @@ export const STUDENT_MENU: SidebarMenuSection[] = [
       { label: 'واجباتي',     icon: 'assignment',        route: '/my-assignments' },
       { label: 'امتحاناتي',   icon: 'quiz',              route: '/my-exams'       },
       { label: 'خطة المذاكرة',icon: 'calendar_view_month',route: '/study-planner' },
+      { label: 'البيانات التاريخية',   icon: 'history',       route: '/historical-data' },
       { label: 'تقييم الحصص', icon: 'feedback',          route: '/lesson-feedback'},
     ],
   },

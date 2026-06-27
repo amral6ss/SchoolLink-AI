@@ -62,6 +62,7 @@ export const routes: Routes = [
   { path: 'lesson-feedback', canActivate: [authGuard], data: { roles: ['admin', 'teacher', 'student'] }, loadComponent: () => import('./features/lesson-feedback/lesson-feedback').then(c => c.LessonFeedback) },
   { path: 'certificate-management', canActivate: [authGuard], data: { roles: ['admin'] }, loadComponent: () => import('./features/certificate-management/certificate-management').then(c => c.CertificateManagement) },
   { path: 'book-parser', canActivate: [authGuard], data: { roles: ['admin', 'teacher'] }, loadComponent: () => import('./features/book-parser/book-parser').then(c => c.BookParser) },
+  { path: 'historical-data', canActivate: [authGuard], data: { roles: ['admin', 'teacher', 'student', 'parent'] }, loadComponent: () => import('./features/historical-data/historical-data').then(c => c.HistoricalDataComponent) },
   { path: 'index', loadComponent: () => import('./features/landing/landing').then(c => c.Landing) },
 
   // Default redirect

@@ -1,0 +1,750 @@
+<app-sidebar [isOpen]="sidebarOpen()" (isOpenChange)="sidebarOpen.set($event)" />
+
+<!-- Animated Background Orbs -->
+<div class="hd-bg">
+  <div class="hd-orb hd-orb-1"></div>
+  <div class="hd-orb hd-orb-2"></div>
+  <div class="hd-orb hd-orb-3"></div>
+</div>
+
+<div class="main-content">
+<div class="hd-page">
+
+  <!-- ═══════════ HEADER ═══════════ -->
+  <div class="page-header">
+    <button class="menu-btn" (click)="sidebarOpen.set(true)">
+      <span class="material-symbols-outlined">menu</span>
+    </button>
+    <div class="header-title">
+      <span class="material-symbols-outlined header-icon">history</span>
+      <div>
+        <h1>البيانات التاريخية</h1>
+        <p class="header-sub">استعراض البيانات الأكاديمية للسنوات الدراسية السابقة</p>
+      </div>
+    </div>
+    <div class="year-selector-wrap">
+      <span class="material-symbols-outlined year-icon">calendar_today</span>
+      <select class="year-select" [(ngModel)]="selectedYearId" (change)="onYearChange()">
+        @for (y of years; track y.id) {
+          <option [value]="y.id">{{ y.name }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <!-- ═══════════ LOADING ═══════════ -->
+  @if (loading()) {
+    <div class="loading-wrap"><div class="spinner"></div><p>جاري تحميل البيانات...</p></div>
+  }
+
+  @if (!loading() && !selectedYearId) {
+    <div class="empty-state">
+      <span class="material-symbols-outlined empty-icon">folder_open</span>
+      <p>لا توجد سنوات دراسية سابقة.</p>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  ADMIN / TEACHER VIEW                                  -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  @if (!loading() && selectedYearId && isAdminOrTeacher()) {
+
+    @if (!selectedClassId) {
+      <div class="section-title">
+        <span class="material-symbols-outlined">meeting_room</span>
+        فصول {{ selectedYearName }}
+        <span class="count-badge">{{ classes.length }} فصل</span>
+      </div>
+
+      @if (classes.length === 0) {
+        <div class="empty-state"><span class="material-symbols-outlined empty-icon">info</span><p>لا توجد فصول مسجلة لهذه السنة.</p></div>
+      }
+
+      <div class="classes-grid">
+        @for (cls of classes; track cls.id) {
+          <div class="class-card" (click)="selectClass(cls.id)">
+            <div class="class-card-icon"><span class="material-symbols-outlined">groups</span></div>
+            <div class="class-card-info">
+              <div class="class-name">{{ cls.gradeLevelName ? cls.gradeLevelName + ' — ' : '' }}{{ cls.name }}</div>
+              <div class="class-meta">{{ cls.studentCount }} طالب</div>
+            </div>
+            <span class="material-symbols-outlined arrow-icon">chevron_left</span>
+          </div>
+        }
+      </div>
+    }
+
+    @if (selectedClassId) {
+      <!-- Back + class info -->
+      <div class="content-header">
+        <button class="back-btn" (click)="backToClasses()">
+          <span class="material-symbols-outlined">arrow_forward</span>
+          العودة للفصول
+        </button>
+        <div class="content-title">
+          <h2>{{ selectedClassName }}</h2>
+          <p>{{ selectedYearName }}</p>
+        </div>
+      </div>
+
+      <!-- Filters bar -->
+      <div class="filters-bar">
+        <select class="filter-select" [(ngModel)]="selectedTerm" (change)="onTermChange()">
+          <option value="">كلا الفصلين</option>
+          <option value="1">الفصل الأول</option>
+          <option value="2">الفصل الثاني</option>
+        </select>
+        <select class="filter-select" [(ngModel)]="selectedSubjectName" (change)="onSubjectChange()">
+          <option value="">كل المواد</option>
+          @for (s of subjectNames; track s) {
+            <option [value]="s">{{ s }}</option>
+          }
+        </select>
+        <div class="search-wrap">
+          <span class="material-symbols-outlined search-icon">search</span>
+          <input type="text" class="student-search" placeholder="بحث عن طالب..." [(ngModel)]="studentSearch" (input)="onStudentSearch()">
+        </div>
+        
+        @if (activeTab === 'grades') {
+          <select class="filter-select" [(ngModel)]="selectedGradeFilter" (change)="currentPage = 1">
+            <option value="">كل التقديرات</option>
+            <option value="exc">ممتاز (90%+)</option>
+            <option value="vgood">جيد جداً (75%+)</option>
+            <option value="good">جيد (60%+)</option>
+            <option value="pass">مقبول (50%+)</option>
+            <option value="fail">راسب (<50%)</option>
+          </select>
+        }
+        
+        @if (activeTab === 'absences') {
+          <div class="date-filter-wrap">
+            <input type="date" class="filter-input" [(ngModel)]="absenceDateFrom" title="تاريخ البداية" (change)="currentPage = 1">
+            <input type="date" class="filter-input" [(ngModel)]="absenceDateTo" title="تاريخ النهاية" (change)="currentPage = 1">
+            <input type="number" class="filter-input" placeholder="غياب أكثر من (أيام)" [(ngModel)]="absenceThreshold" min="1" title="تجاوز الغياب" (input)="currentPage = 1">
+          </div>
+        }
+
+        <div class="export-btns">
+          <button class="export-btn" (click)="exportExcel()" title="تصدير Excel">
+            <span class="material-symbols-outlined">download</span>
+            Excel
+          </button>
+          <button class="export-btn" (click)="exportPDF()" title="تصدير PDF">
+            <span class="material-symbols-outlined">picture_as_pdf</span>
+            PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats cards -->
+      <div class="stats-row">
+        <div class="stat-card stat-avg">
+          <span class="material-symbols-outlined stat-icon">analytics</span>
+          <span class="stat-num" [style.color]="pctColor(filteredStats.avg)">{{ filteredStats.avg }}%</span>
+          <span class="stat-lbl">المتوسط</span>
+        </div>
+        <div class="stat-card stat-total">
+          <span class="material-symbols-outlined stat-icon">grading</span>
+          <span class="stat-num">{{ filteredStats.total }}</span>
+          <span class="stat-lbl">إجمالي الدرجات</span>
+        </div>
+        <div class="stat-card stat-pass">
+          <span class="material-symbols-outlined stat-icon">check_circle</span>
+          <span class="stat-num">{{ filteredStats.pass }}</span>
+          <span class="stat-lbl">ناجح</span>
+        </div>
+        <div class="stat-card stat-fail">
+          <span class="material-symbols-outlined stat-icon">cancel</span>
+          <span class="stat-num">{{ filteredStats.fail }}</span>
+          <span class="stat-lbl">راسب</span>
+        </div>
+        <div class="stat-card stat-students">
+          <span class="material-symbols-outlined stat-icon">groups</span>
+          <span class="stat-num">{{ classTotalStudents }}</span>
+          <span class="stat-lbl">الطلاب</span>
+        </div>
+      </div>
+
+      <!-- Tabs (sticky) -->
+      <div class="tabs-wrap" #tabsWrap>
+        <div class="tabs-bar">
+          <button class="tab-btn" [class.active]="activeTab === 'grades'" (click)="onTabChange('grades')">
+            <span class="material-symbols-outlined">grade</span> الدرجات النهائية
+          </button>
+          <button class="tab-btn" [class.active]="activeTab === 'assessments'" (click)="onTabChange('assessments')">
+            <span class="material-symbols-outlined">assignment</span> التقييمات الدورية
+          </button>
+          <button class="tab-btn" [class.active]="activeTab === 'absences'" (click)="onTabChange('absences')">
+            <span class="material-symbols-outlined">event_busy</span> الغياب
+          </button>
+          <button class="tab-btn" [class.active]="activeTab === 'evaluations'" (click)="onTabChange('evaluations')">
+            <span class="material-symbols-outlined">checklist</span> التقييمات
+          </button>
+        </div>
+      </div>
+
+      <!-- Grades Tab -->
+      @if (activeTab === 'grades') {
+        @if (loadingGrades()) { <div class="loading-wrap"><div class="spinner"></div></div> }
+
+        @if (!loadingGrades() && pagedGrades.length > 0) {
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th (click)="toggleSort('studentName')" class="sortable">الطالب @if (sortCol === 'studentName') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('subjectName')" class="sortable">المادة @if (sortCol === 'subjectName') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('academicTerm')" class="sortable">الفصل @if (sortCol === 'academicTerm') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th>متوسط السنة</th>
+                  <th>اختبار 1</th>
+                  <th>اختبار 2</th>
+                  <th>امتحان الترم</th>
+                  <th>المجموع</th>
+                  <th (click)="toggleSort('percentage')" class="sortable">النسبة @if (sortCol === 'percentage') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th>التقدير</th>
+                  <th>التقدم</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (g of pagedGrades; track g.id; let i = $index) {
+                  <tr [class.fail-row]="g.percentage < 50">
+                    <td>{{ (currentPage - 1) * pageSize + i + 1 }}</td>
+                    <td class="cell-name">{{ g.studentName ?? '—' }}</td>
+                    <td>{{ g.subjectName ?? '—' }}</td>
+                    <td>{{ termLabel(g.academicTerm) }}</td>
+                    <td>{{ g.periodAvgScore | number:'1.1-1' }}</td>
+                    <td>{{ g.assessment1Score | number:'1.1-1' }}</td>
+                    <td>{{ g.assessment2Score | number:'1.1-1' }}</td>
+                    <td>{{ g.finalExamScore | number:'1.1-1' }}</td>
+                    <td class="cell-total">{{ g.total | number:'1.1-1' }} <span class="max-label">/ {{ g.maxTotal }}</span></td>
+                    <td>
+                      <span class="pct-val" [style.color]="pctColor(g.percentage)">{{ g.percentage }}%</span>
+                    </td>
+                    <td>
+                      <span class="badge {{ getGradeBadge(g.percentage).cls }}">{{ getGradeBadge(g.percentage).label }}</span>
+                    </td>
+                    <td>
+                      <div class="progress-cell">
+                        <div class="progress-bar">
+                          <div class="progress-fill" [style.width]="g.percentage + '%'" [style.background]="pctColor(g.percentage)"></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <button class="icon-btn" (click)="openStudentDetail(g.studentId)" title="تفاصيل الطالب">
+                        <span class="material-symbols-outlined">visibility</span>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <!-- Pagination -->
+          @if (totalPages > 1) {
+            <div class="pagination">
+              <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">
+                <span class="material-symbols-outlined">chevron_right</span>
+              </button>
+              @for (p of visiblePages; track p) {
+                <button class="page-btn" [class.active]="p === currentPage" (click)="goToPage(p)">{{ p }}</button>
+              }
+              <button class="page-btn" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">
+                <span class="material-symbols-outlined">chevron_left</span>
+              </button>
+              <span class="page-info">{{ sortedGrades.length }} سجل — صفحة {{ currentPage }} من {{ totalPages }}</span>
+            </div>
+          }
+        }
+        @if (!loadingGrades() && sortedGrades.length === 0) {
+          <div class="empty-state"><span class="material-symbols-outlined empty-icon">assignment</span><p>لا توجد درجات.</p></div>
+        }
+      }
+
+      <!-- Evaluations Tab -->
+      @if (activeTab === 'evaluations') {
+        @if (loadingEvals()) { <div class="loading-wrap"><div class="spinner"></div></div> }
+        @if (!loadingEvals() && pagedEvaluations.length > 0) {
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th (click)="toggleSort('studentName')" class="sortable">الطالب @if (sortCol === 'studentName') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('itemName')" class="sortable">عنصر التقييم @if (sortCol === 'itemName') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('periodName')" class="sortable">الفترة @if (sortCol === 'periodName') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('score')" class="sortable">الدرجة @if (sortCol === 'score') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th>القصوى</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (e of pagedEvaluations; track $index; let i = $index) {
+                  <tr>
+                    <td>{{ (currentPage - 1) * pageSize + i + 1 }}</td>
+                    <td class="cell-name">{{ e.studentName ?? '—' }}</td>
+                    <td>{{ e.itemName ?? '—' }}</td>
+                    <td>{{ e.periodName ?? '—' }}</td>
+                    <td>{{ e.score ?? '—' }}</td>
+                    <td>{{ e.maxScore }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (evalTotalPages > 1) {
+            <div class="pagination">
+              <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">
+                <span class="material-symbols-outlined">chevron_right</span>
+              </button>
+              <span class="page-info">صفحة {{ currentPage }} من {{ evalTotalPages }}</span>
+              <button class="page-btn" [disabled]="currentPage === evalTotalPages" (click)="goToPage(currentPage + 1)">
+                <span class="material-symbols-outlined">chevron_left</span>
+              </button>
+            </div>
+          }
+        }
+        @if (!loadingEvals() && pagedEvaluations.length === 0) {
+          <div class="empty-state"><span class="material-symbols-outlined empty-icon">checklist</span><p>لا توجد تقييمات.</p></div>
+        }
+      }
+
+      <!-- Assessments Tab -->
+      @if (activeTab === 'assessments') {
+        @if (loadingAssess()) { <div class="loading-wrap"><div class="spinner"></div></div> }
+        @if (!loadingAssess() && pagedAssessments.length > 0) {
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th (click)="toggleSort('studentName')" class="sortable">الطالب @if (sortCol === 'studentName') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('subjectName')" class="sortable">المادة @if (sortCol === 'subjectName') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('assessmentType')" class="sortable">النوع @if (sortCol === 'assessmentType') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('term')" class="sortable">الفصل @if (sortCol === 'term') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('score')" class="sortable">الدرجة @if (sortCol === 'score') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th>القصوى</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of pagedAssessments; track a.id; let i = $index) {
+                  <tr>
+                    <td>{{ (currentPage - 1) * pageSize + i + 1 }}</td>
+                    <td class="cell-name">{{ a.studentName ?? '—' }}</td>
+                    <td>{{ a.subjectName ?? '—' }}</td>
+                    <td>{{ a.assessmentType }}</td>
+                    <td>{{ termLabel(a.term) }}</td>
+                    <td>{{ a.score }}</td>
+                    <td>{{ a.maxScore }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (assessTotalPages > 1) {
+            <div class="pagination">
+              <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">
+                <span class="material-symbols-outlined">chevron_right</span>
+              </button>
+              <span class="page-info">صفحة {{ currentPage }} من {{ assessTotalPages }}</span>
+              <button class="page-btn" [disabled]="currentPage === assessTotalPages" (click)="goToPage(currentPage + 1)">
+                <span class="material-symbols-outlined">chevron_left</span>
+              </button>
+            </div>
+          }
+        }
+        @if (!loadingAssess() && pagedAssessments.length === 0) {
+          <div class="empty-state"><span class="material-symbols-outlined empty-icon">assignment</span><p>لا توجد تقييمات دورية.</p></div>
+        }
+      }
+
+      <!-- Absences Tab -->
+      @if (activeTab === 'absences') {
+        @if (loadingAbsences()) { <div class="loading-wrap"><div class="spinner"></div></div> }
+        @if (!loadingAbsences() && pagedAbsences.length > 0) {
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th (click)="toggleSort('studentName')" class="sortable">الطالب @if (sortCol === 'studentName') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('subjectName')" class="sortable">المادة @if (sortCol === 'subjectName') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('absenceDate')" class="sortable">التاريخ @if (sortCol === 'absenceDate') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th (click)="toggleSort('isAbsent')" class="sortable">الحالة @if (sortCol === 'isAbsent') { <span class="material-symbols-outlined sort-icon">{{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span> }</th>
+                  <th>السبب</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of pagedAbsences; track $index; let i = $index) {
+                  <tr>
+                    <td>{{ (currentPage - 1) * pageSize + i + 1 }}</td>
+                    <td class="cell-name">{{ a.studentName ?? '—' }}</td>
+                    <td>{{ a.subjectName ?? '—' }}</td>
+                    <td>{{ a.absenceDate }}</td>
+                    <td>
+                      <span class="status-badge" [class.absent]="a.isAbsent" [class.present]="!a.isAbsent">
+                        {{ a.isAbsent ? 'غائب' : 'حاضر' }}
+                      </span>
+                    </td>
+                    <td>{{ a.reason ?? '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (absencesTotalPages > 1) {
+            <div class="pagination">
+              <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">
+                <span class="material-symbols-outlined">chevron_right</span>
+              </button>
+              <span class="page-info">صفحة {{ currentPage }} من {{ absencesTotalPages }}</span>
+              <button class="page-btn" [disabled]="currentPage === absencesTotalPages" (click)="goToPage(currentPage + 1)">
+                <span class="material-symbols-outlined">chevron_left</span>
+              </button>
+            </div>
+          }
+        }
+        @if (!loadingAbsences() && pagedAbsences.length === 0) {
+          <div class="empty-state"><span class="material-symbols-outlined empty-icon">event_busy</span><p>لا توجد سجلات غياب.</p></div>
+        }
+      }
+    }
+  }
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  STUDENT VIEW                                          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  @if (!loading() && selectedYearId && isStudent()) {
+    <div class="section-title">
+      <span class="material-symbols-outlined">school</span>
+      بياناتي في {{ selectedYearName }}
+    </div>
+
+    @if (detailLoading()) {
+      <div class="loading-wrap"><div class="spinner"></div></div>
+    }
+
+    @if (detailStudent && !detailLoading()) {
+      <ng-container *ngTemplateOutlet="studentDetail; context: { $implicit: detailStudent }"></ng-container>
+    }
+
+    @if (!detailStudent && !detailLoading()) {
+      <div class="empty-state">
+        <span class="material-symbols-outlined empty-icon">assignment</span>
+        <p>لم يتم العثور على بيانات لك في هذه السنة.</p>
+      </div>
+    }
+  }
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  PARENT VIEW                                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  @if (!loading() && selectedYearId && isParent()) {
+    <div class="section-title">
+      <span class="material-symbols-outlined">supervisor_account</span>
+      أبنائي في {{ selectedYearName }}
+    </div>
+
+    @if (children.length === 0) {
+      <div class="empty-state"><span class="material-symbols-outlined empty-icon">people</span><p>لا يوجد أبناء.</p></div>
+    }
+
+    @if (children.length > 0) {
+      <div class="children-tabs">
+        @for (child of children; track child.studentId) {
+          <button class="child-tab" [class.active]="selectedChildId === child.studentId"
+                  (click)="selectChild(child.studentId)">
+            <span class="material-symbols-outlined">person</span> {{ child.studentName }}
+          </button>
+        }
+      </div>
+
+      @if (detailLoading()) { <div class="loading-wrap"><div class="spinner"></div></div> }
+
+      @if (detailStudent && !detailLoading()) {
+        <ng-container *ngTemplateOutlet="studentDetail; context: { $implicit: detailStudent }"></ng-container>
+      }
+    }
+  }
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  STUDENT DETAIL MODAL                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+@if (isAdminOrTeacher() && showStudentDetail() && detailStudent && !detailLoading()) {
+  <div class="modal-overlay" (click)="closeStudentDetail()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>{{ detailStudent.studentName }}</h2>
+          <p>{{ detailStudent.gradeLevelName ? detailStudent.gradeLevelName + ' — ' : '' }}{{ detailStudent.className }}</p>
+        </div>
+        <button class="close-btn" (click)="closeStudentDetail()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <ng-container *ngTemplateOutlet="studentDetail; context: { $implicit: detailStudent }"></ng-container>
+    </div>
+  </div>
+}
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  STUDENT DETAIL TEMPLATE (reusable)                     -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<ng-template #studentDetail let-s>
+  
+  <!-- STUDENT TOOLBAR -->
+  <div class="student-detail-toolbar">
+    <div class="student-tabs">
+      <button class="student-tab-btn" [class.active]="studentDetailTerm === ''" (click)="studentDetailTerm = ''">العام الكامل</button>
+      <button class="student-tab-btn" [class.active]="studentDetailTerm === 1" (click)="studentDetailTerm = 1">الفصل الأول</button>
+      <button class="student-tab-btn" [class.active]="studentDetailTerm === 2" (click)="studentDetailTerm = 2">الفصل الثاني</button>
+    </div>
+    <div class="student-export">
+      <button class="export-btn" (click)="exportStudentExcel()" title="تصدير تقرير الطالب (Excel)">
+        <span class="material-symbols-outlined">download</span> Excel
+      </button>
+      <button class="export-btn" (click)="exportStudentPDF()" title="تصدير تقرير الطالب (PDF)">
+        <span class="material-symbols-outlined">picture_as_pdf</span> PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- Final Grades -->
+  <div class="detail-section">
+    <h3 class="collapsible-header" (click)="toggleSection('grades')">
+      <div class="header-title">
+        <span class="material-symbols-outlined">grade</span> الدرجات النهائية
+      </div>
+      <span class="material-symbols-outlined expand-icon" [class.expanded]="sectionsExpanded.grades">expand_more</span>
+    </h3>
+    @if (sectionsExpanded.grades) {
+      @if (studentGrades.length > 0) {
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>#</th><th>المادة</th><th>الفصل</th><th>متوسط السنة</th><th>اختبار 1</th><th>اختبار 2</th><th>امتحان الترم</th><th>المجموع</th><th>النسبة</th><th>التقدير</th></tr>
+            </thead>
+            <tbody>
+              @for (g of pagedStudentGrades; track g.id; let i = $index) {
+                <tr [class.fail-row]="g.percentage < 50">
+                  <td>{{ (studentGradesPage - 1) * studentPageSize + i + 1 }}</td>
+                  <td>{{ g.subjectName ?? '—' }}</td>
+                  <td>{{ termLabel(g.academicTerm) }}</td>
+                  <td>{{ g.periodAvgScore | number:'1.1-1' }}</td>
+                  <td>{{ g.assessment1Score | number:'1.1-1' }}</td>
+                  <td>{{ g.assessment2Score | number:'1.1-1' }}</td>
+                  <td>{{ g.finalExamScore | number:'1.1-1' }}</td>
+                  <td class="cell-total">{{ g.total | number:'1.1-1' }} <span class="max-label">/ {{ g.maxTotal }}</span></td>
+                  <td><span class="pct-val" [style.color]="pctColor(g.percentage)">{{ g.percentage }}%</span></td>
+                  <td><span class="badge {{ getGradeBadge(g.percentage).cls }}">{{ getGradeBadge(g.percentage).label }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (studentGradesTotalPages > 1) {
+          <div class="pagination" style="margin-top: 10px;">
+            <button class="page-btn" [disabled]="studentGradesPage === 1" (click)="studentGradesPage = studentGradesPage - 1"><span class="material-symbols-outlined">chevron_right</span></button>
+            <span class="page-info">صفحة {{ studentGradesPage }} من {{ studentGradesTotalPages }}</span>
+            <button class="page-btn" [disabled]="studentGradesPage === studentGradesTotalPages" (click)="studentGradesPage = studentGradesPage + 1"><span class="material-symbols-outlined">chevron_left</span></button>
+          </div>
+        }
+      } @else {
+        <p class="no-data">لا توجد درجات نهائية.</p>
+      }
+    }
+  </div>
+
+  <!-- Periodic Assessments -->
+  <div class="detail-section">
+    <h3 class="collapsible-header" (click)="toggleSection('assessments')">
+      <div class="header-title">
+        <span class="material-symbols-outlined">assignment</span> التقييمات الدورية
+      </div>
+      <span class="material-symbols-outlined expand-icon" [class.expanded]="sectionsExpanded.assessments">expand_more</span>
+    </h3>
+    @if (sectionsExpanded.assessments) {
+      @if (studentAssessments.length > 0) {
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>المادة</th><th>النوع</th><th>الفصل</th><th>الدرجة</th><th>القصوى</th></tr></thead>
+            <tbody>
+              @for (a of pagedStudentAssessments; track a.id; let i = $index) {
+                <tr><td>{{ (studentAssessPage - 1) * studentPageSize + i + 1 }}</td><td>{{ a.subjectName ?? '—' }}</td><td>{{ a.assessmentType }}</td><td>{{ termLabel(a.term) }}</td><td>{{ a.score }}</td><td>{{ a.maxScore }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (studentAssessTotalPages > 1) {
+          <div class="pagination" style="margin-top: 10px;">
+            <button class="page-btn" [disabled]="studentAssessPage === 1" (click)="studentAssessPage = studentAssessPage - 1"><span class="material-symbols-outlined">chevron_right</span></button>
+            <span class="page-info">صفحة {{ studentAssessPage }} من {{ studentAssessTotalPages }}</span>
+            <button class="page-btn" [disabled]="studentAssessPage === studentAssessTotalPages" (click)="studentAssessPage = studentAssessPage + 1"><span class="material-symbols-outlined">chevron_left</span></button>
+          </div>
+        }
+      } @else {
+        <p class="no-data">لا توجد تقييمات دورية.</p>
+      }
+    }
+  </div>
+
+  <!-- Exams -->
+  <div class="detail-section">
+    <h3 class="collapsible-header" (click)="toggleSection('exams')">
+      <div class="header-title">
+        <span class="material-symbols-outlined">quiz</span> الامتحانات
+      </div>
+      <span class="material-symbols-outlined expand-icon" [class.expanded]="sectionsExpanded.exams">expand_more</span>
+    </h3>
+    @if (sectionsExpanded.exams) {
+      @if (s.exams.length > 0) {
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>الامتحان</th><th>المادة</th><th>الدرجة</th><th>القصوى</th><th>النسبة</th></tr></thead>
+            <tbody>
+              @for (e of pagedStudentExams; track e.examId; let i = $index) {
+                <tr>
+                  <td>{{ (studentExamsPage - 1) * studentPageSize + i + 1 }}</td>
+                  <td>{{ e.examTitle ?? '—' }}</td>
+                  <td>{{ e.subjectName ?? '—' }}</td>
+                  <td>{{ e.score ?? '—' }}</td>
+                  <td>{{ e.totalScore ?? '—' }}</td>
+                  <td>{{ e.percentage != null ? (e.percentage | number:'1.1-1') + '%' : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (studentExamsTotalPages > 1) {
+          <div class="pagination" style="margin-top: 10px;">
+            <button class="page-btn" [disabled]="studentExamsPage === 1" (click)="studentExamsPage = studentExamsPage - 1"><span class="material-symbols-outlined">chevron_right</span></button>
+            <span class="page-info">صفحة {{ studentExamsPage }} من {{ studentExamsTotalPages }}</span>
+            <button class="page-btn" [disabled]="studentExamsPage === studentExamsTotalPages" (click)="studentExamsPage = studentExamsPage + 1"><span class="material-symbols-outlined">chevron_left</span></button>
+          </div>
+        }
+      } @else {
+        <p class="no-data">لا توجد امتحانات.</p>
+      }
+    }
+  </div>
+
+  <!-- Assignments -->
+  <div class="detail-section">
+    <h3 class="collapsible-header" (click)="toggleSection('assignments')">
+      <div class="header-title">
+        <span class="material-symbols-outlined">home_work</span> الواجبات
+      </div>
+      <span class="material-symbols-outlined expand-icon" [class.expanded]="sectionsExpanded.assignments">expand_more</span>
+    </h3>
+    @if (sectionsExpanded.assignments) {
+      @if (s.assignments.length > 0) {
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>الواجب</th><th>المادة</th><th>الدرجة</th><th>القصوى</th><th>النسبة</th></tr></thead>
+            <tbody>
+              @for (a of pagedStudentAssigns; track a.assignmentId; let i = $index) {
+                <tr>
+                  <td>{{ (studentAssignsPage - 1) * studentPageSize + i + 1 }}</td>
+                  <td>{{ a.assignmentTitle ?? '—' }}</td>
+                  <td>{{ a.subjectName ?? '—' }}</td>
+                  <td>{{ a.score ?? '—' }}</td>
+                  <td>{{ a.maxScore ?? '—' }}</td>
+                  <td>{{ a.percentage != null ? (a.percentage | number:'1.1-1') + '%' : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (studentAssignsTotalPages > 1) {
+          <div class="pagination" style="margin-top: 10px;">
+            <button class="page-btn" [disabled]="studentAssignsPage === 1" (click)="studentAssignsPage = studentAssignsPage - 1"><span class="material-symbols-outlined">chevron_right</span></button>
+            <span class="page-info">صفحة {{ studentAssignsPage }} من {{ studentAssignsTotalPages }}</span>
+            <button class="page-btn" [disabled]="studentAssignsPage === studentAssignsTotalPages" (click)="studentAssignsPage = studentAssignsPage + 1"><span class="material-symbols-outlined">chevron_left</span></button>
+          </div>
+        }
+      } @else {
+        <p class="no-data">لا توجد واجبات.</p>
+      }
+    }
+  </div>
+
+  <!-- Absences -->
+  <div class="detail-section">
+    <h3 class="collapsible-header" (click)="toggleSection('absences')">
+      <div class="header-title">
+        <span class="material-symbols-outlined">event_busy</span> سجل الغياب
+      </div>
+      <span class="material-symbols-outlined expand-icon" [class.expanded]="sectionsExpanded.absences">expand_more</span>
+    </h3>
+    @if (sectionsExpanded.absences) {
+      <div class="date-filter-wrap" style="margin-bottom: 12px; display: flex; gap: 8px;">
+        <input type="date" class="filter-input" [(ngModel)]="absenceDateFrom" title="تاريخ البداية">
+        <input type="date" class="filter-input" [(ngModel)]="absenceDateTo" title="تاريخ النهاية">
+      </div>
+      @if (studentAbsences.length > 0) {
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>المادة</th><th>التاريخ</th><th>الحالة</th><th>السبب</th></tr></thead>
+            <tbody>
+              @for (a of pagedStudentAbsences; track $index; let i = $index) {
+                <tr>
+                  <td>{{ (studentAbsencesPage - 1) * studentPageSize + i + 1 }}</td>
+                  <td>{{ a.subjectName ?? '—' }}</td>
+                  <td>{{ a.absenceDate }}</td>
+                  <td><span class="status-badge" [class.absent]="a.isAbsent" [class.present]="!a.isAbsent">{{ a.isAbsent ? 'غائب' : 'حاضر' }}</span></td>
+                  <td>{{ a.reason ?? '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (studentAbsencesTotalPages > 1) {
+          <div class="pagination" style="margin-top: 10px;">
+            <button class="page-btn" [disabled]="studentAbsencesPage === 1" (click)="studentAbsencesPage = studentAbsencesPage - 1"><span class="material-symbols-outlined">chevron_right</span></button>
+            <span class="page-info">صفحة {{ studentAbsencesPage }} من {{ studentAbsencesTotalPages }}</span>
+            <button class="page-btn" [disabled]="studentAbsencesPage === studentAbsencesTotalPages" (click)="studentAbsencesPage = studentAbsencesPage + 1"><span class="material-symbols-outlined">chevron_left</span></button>
+          </div>
+        }
+      } @else {
+        <p class="no-data">لا توجد سجلات غياب.</p>
+      }
+    }
+  </div>
+
+  <!-- Evaluations -->
+  <div class="detail-section">
+    <h3 class="collapsible-header" (click)="toggleSection('evaluations')">
+      <div class="header-title">
+        <span class="material-symbols-outlined">checklist</span> التقييمات
+      </div>
+      <span class="material-symbols-outlined expand-icon" [class.expanded]="sectionsExpanded.evaluations">expand_more</span>
+    </h3>
+    @if (sectionsExpanded.evaluations) {
+      @if (s.evaluations.length > 0) {
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>عنصر التقييم</th><th>الفترة</th><th>الدرجة</th><th>القصوى</th></tr></thead>
+            <tbody>
+              @for (e of pagedStudentEvals; track $index; let i = $index) {
+                <tr><td>{{ (studentEvalsPage - 1) * studentPageSize + i + 1 }}</td><td>{{ e.itemName ?? '—' }}</td><td>{{ e.periodName ?? '—' }}</td><td>{{ e.score ?? '—' }}</td><td>{{ e.maxScore }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (studentEvalsTotalPages > 1) {
+          <div class="pagination" style="margin-top: 10px;">
+            <button class="page-btn" [disabled]="studentEvalsPage === 1" (click)="studentEvalsPage = studentEvalsPage - 1"><span class="material-symbols-outlined">chevron_right</span></button>
+            <span class="page-info">صفحة {{ studentEvalsPage }} من {{ studentEvalsTotalPages }}</span>
+            <button class="page-btn" [disabled]="studentEvalsPage === studentEvalsTotalPages" (click)="studentEvalsPage = studentEvalsPage + 1"><span class="material-symbols-outlined">chevron_left</span></button>
+          </div>
+        }
+      } @else {
+        <p class="no-data">لا توجد تقييمات.</p>
+      }
+    }
+  </div>
+</ng-template>
+</div>
