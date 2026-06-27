@@ -221,7 +221,7 @@ export class LessonFeedback implements OnInit {
     this.teacherSubjects.set(items);
     for (const s of items) {
       const summary = await this.service.getFeedbackSummary(s.id).toPromise();
-      this.summaries.update(m => { m[s.id] = summary; return m; });
+      this.summaries.update(m => ({ ...m, [s.id]: summary }));
     }
   }
 
@@ -240,7 +240,7 @@ export class LessonFeedback implements OnInit {
     this.expandedCst.set(cstId);
     if (this.role() === 'teacher') {
       const raw = await this.service.getFeedbackRaw(cstId).toPromise();
-      this.teacherRawFeedback.update(m => { m[cstId] = raw ?? []; return m; });
+      this.teacherRawFeedback.update(m => ({ ...m, [cstId]: raw ?? [] }));
     }
   }
 
@@ -264,10 +264,10 @@ export class LessonFeedback implements OnInit {
 
     for (const s of items) {
       const summary = await this.service.getFeedbackSummary(s.id).toPromise();
-      this.adminSummaries.update(m => { m[s.id] = summary; return m; });
+      this.adminSummaries.update(m => ({ ...m, [s.id]: summary }));
 
       const raw = await this.service.getFeedbackRaw(s.id).toPromise();
-      this.rawFeedback.update(m => { m[s.id] = raw ?? []; return m; });
+      this.rawFeedback.update(m => ({ ...m, [s.id]: raw ?? [] }));
     }
   }
 

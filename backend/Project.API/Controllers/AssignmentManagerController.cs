@@ -110,9 +110,11 @@ public class AssignmentManagerController : ControllerBase
     [Authorize(Roles = "Admin,Teacher")]
     public async Task<IActionResult> Delete(int id)
     {
-        var result = await _service.DeleteAsync(id);
+        var userId = GetUserId();
+        var role = GetUserRole();
+        var result = await _service.DeleteAsync(id, userId, role);
         if (!result.IsSuccess)
-            return BadRequest(result);
+            return StatusCode(result.StatusCode, result);
         return Ok(result);
     }
 

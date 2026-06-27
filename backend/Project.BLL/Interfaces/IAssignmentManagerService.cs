@@ -125,7 +125,7 @@ public interface IAssignmentManagerService
     Task<OperationResult<AssignmentManagerDetailDto>> GetByIdAsync(int id);
     Task<OperationResult<AssignmentManagerItemDto>> CreateAsync(CreateAssignmentManagerDto dto, int teacherId);
     Task<OperationResult> UpdateAsync(int id, UpdateAssignmentManagerDto dto);
-    Task<OperationResult> DeleteAsync(int id);
+    Task<OperationResult> DeleteAsync(int id, int userId, string role);
     Task<OperationResult<AssignmentManagerStatsDto>> GetStatsAsync(AssignmentFilterDto filter);
     
     Task<OperationResult<List<AssignmentSubmissionListItemDto>>> GetSubmissionsAsync(int assignmentId);
