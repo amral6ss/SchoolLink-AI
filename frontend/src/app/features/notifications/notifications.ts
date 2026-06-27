@@ -1,4 +1,4 @@
-﻿import { Component, signal, computed, OnInit, inject, effect } from '@angular/core';
+import { Component, signal, computed, OnInit, OnDestroy, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Sidebar } from '../../layouts/sidebar/sidebar';
@@ -12,7 +12,7 @@ import { NotificationSignalRService } from '../../core/services/notification-sig
   templateUrl: './notifications.html',
   styleUrl: './notifications.css',
 })
-export class Notifications implements OnInit {
+export class Notifications implements OnInit, OnDestroy {
   private notifService = inject(NotificationService);
   private authService = inject(AuthService);
   private router = inject(Router);
@@ -25,6 +25,8 @@ export class Notifications implements OnInit {
   activeFilter = signal<'all' | 'academic' | 'general' | 'system'>('all');
   userId!: number;
   userName = computed(() => this.authService.user()?.fullName ?? 'ولي الأمر');
+  currentTime = signal(new Date());
+  private timerId: any;
 
   ngOnInit() {
     const user = this.authService.user();
@@ -37,6 +39,17 @@ export class Notifications implements OnInit {
     this.notifSignalR.startConnection();
     // نفضّل الإشعار المخزّن عشان ما يتضفش تاني من useEffect
     this.notifSignalR.clearNotification();
+
+    // تحديث الوقت كل دقيقة عشان الـ "الآن" تتغير
+    this.timerId = setInterval(() => {
+      this.currentTime.set(new Date());
+    }, 60000);
+  }
+
+  ngOnDestroy() {
+    if (this.timerId) {
+      clearInterval(this.timerId);
+    }
   }
 
   constructor() {
@@ -228,10 +241,13 @@ export class Notifications implements OnInit {
 
   getTimeAgo(dateStr: string): string {
     if (!dateStr) return '';
-    const now = new Date();
+    const now = this.currentTime();
     const date = new Date(dateStr);
-    // طرح ساعة لتعويض فارق التوقيت الصيفي (Windows timezone data لمصر مش متحدّث)
-    const diffMs = now.getTime() - date.getTime() - 3600000;
+    
+    // إزالة طرح الساعة لأن الخادم يرسل التوقيت الصحيح، وإضافة Math.max لمنع أي قيم سالبة بسبب فرق الثواني
+    let diffMs = now.getTime() - date.getTime();
+    diffMs = Math.max(0, diffMs);
+    
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
