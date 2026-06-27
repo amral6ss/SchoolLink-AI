@@ -391,11 +391,20 @@ public class AssignmentManagerService : IAssignmentManagerService
         return OperationResult.Success("تم تحديث الواجب بنجاح");
     }
 
-    public async Task<OperationResult> DeleteAsync(int id)
+    public async Task<OperationResult> DeleteAsync(int id, int userId, string role)
     {
         var assignment = await _unitOfWork.Assignments.GetByIdAsync(id);
         if (assignment is null || assignment.IsDeleted)
             return OperationResult.Failure("الواجب غير موجود", 404);
+
+        // Admin can delete any assignment; Teacher can only delete their own
+        if (role == "Teacher")
+        {
+            var ownsAssignment = await _context.ClassSubjectTeachers
+                .AnyAsync(cst => cst.Id == assignment.ClassSubjectTeacherId && cst.TeacherId == userId);
+            if (!ownsAssignment)
+                return OperationResult.Failure("لا يمكنك حذف هذا الواجب — أنت لست مدرس المادة", 403);
+        }
 
         var submissionCount = await _context.StudentAssignmentSubmissions.CountAsync(s => s.AssignmentId == id && !s.IsDeleted);
         if (submissionCount > 0)

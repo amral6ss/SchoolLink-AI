@@ -70,9 +70,10 @@ export class ExamManagement implements OnInit, OnDestroy {
   aiGradeError = signal('');
 
   // ── Form fields ───────────────────────────────────────────────
-  formError  = signal('');
-  loadError  = signal('');
-  loading    = signal(false);
+  formError     = signal('');
+  loadError     = signal('');
+  successMessage = signal('');
+  loading       = signal(false);
 
   newName      = signal('');
   newSubjectId = signal<number | null>(null);
@@ -534,8 +535,19 @@ export class ExamManagement implements OnInit, OnDestroy {
 
     this.api.publish(exam.id).subscribe({
       next: r => {
-        if (r.isSuccess) { this.closeModals(); this.loadAll(); }
-        else this.formError.set(r.message ?? 'تعذّر النشر');
+        if (r.isSuccess) {
+          // تحديث فوري للـ UI — نخلي الامتحان يختفي من زراير النشر فوراً
+          this.exams.update(list =>
+            list.map(e => e.id === exam.id ? { ...e, status: 'upcoming' } : e)
+          );
+          this.successMessage.set(r.message ?? 'تم نشر الامتحان بنجاح');
+          this.formError.set('');
+          this.closeModals();
+          this.loadAll();
+          setTimeout(() => this.successMessage.set(''), 3000);
+        } else {
+          this.formError.set(r.message ?? 'تعذّر النشر');
+        }
       },
       error: err => this.formError.set(err?.error?.message ?? 'خطأ في الشبكة')
     });

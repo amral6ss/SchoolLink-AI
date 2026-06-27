@@ -393,20 +393,6 @@
   box-shadow: 0 8px 32px rgba(0,0,0,0.06);
 }
 .ca-widget-glass { background: rgba(255,255,255,0.7); }
-.ca-widget-ai {
-  background: linear-gradient(135deg, rgba(139,92,246,0.05), rgba(59,130,246,0.05));
-  border-color: rgba(139,92,246,0.2);
-  position: relative;
-}
-.ca-widget-ai::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #8b5cf6, #3b82f6, #06b6d4);
-}
 
 .ca-widget-header {
   display: flex;
@@ -833,60 +819,6 @@
   margin: 14px 0 0;
 }
 
-/* ─── AI Plan ─── */
-.ca-ai-item {
-  display: flex;
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(0,0,0,0.04);
-}
-.ca-ai-item:last-child { border-bottom: none; padding-bottom: 0; }
-.ca-ai-item:first-child { padding-top: 0; }
-.ca-ai-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.ca-ai-icon .material-symbols-outlined { font-size: 20px; color: #fff; font-variation-settings: 'FILL' 1; }
-.ca-ai-urgent { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
-.ca-ai-support { background: linear-gradient(135deg, #059669, #10b981); }
-.ca-ai-attendance { background: linear-gradient(135deg, #d97706, #f59e0b); }
-.ca-ai-insight { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
-
-.ca-ai-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #1a1b21;
-  margin: 0 0 3px;
-}
-.ca-ai-desc {
-  font-size: 12px;
-  color: #6b7280;
-  margin: 0;
-  line-height: 1.6;
-}
-.ca-ai-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 14px;
-  padding: 10px;
-  border-radius: 12px;
-  background: rgba(139,92,246,0.06);
-  color: #7c3aed;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-.ca-ai-link:hover {
-  background: rgba(139,92,246,0.12);
-}
 
 /* ─── Risk List ─── */
 .ca-risk-item {

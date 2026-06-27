@@ -141,6 +141,14 @@
         <span class="legend-item"><span class="legend-dot legend-slate"></span>مسودة</span>
       </div>
 
+      <!-- Success Toast -->
+      @if (successMessage()) {
+        <div class="success-toast">
+          <span class="material-symbols-outlined">check_circle</span>
+          <span>{{ successMessage() }}</span>
+        </div>
+      }
+
       <!-- Exam Cards -->
       @if (!loading() && !loadError() && exams().length > 0) {
         <div class="exam-list">
@@ -606,6 +614,13 @@
           <div class="bg-white/40 rounded-xl px-3 py-2 text-label-sm text-outline">{{ exam?.duration }} دقيقة</div>
         </div>
       </div>
+      @if (formError()) {
+        <div class="px-stack-lg pb-2">
+          <div class="rounded-xl border border-error/20 bg-error/10 px-4 py-3 text-error font-label-sm text-label-sm">
+            {{ formError() }}
+          </div>
+        </div>
+      }
       <div class="glass-modal-footer flex justify-end gap-3">
         <button class="secondary-btn-glass" (click)="closeModals()">إلغاء</button>
         <button class="gradient-btn" (click)="confirmPublish()">نشر للطلاب</button>
