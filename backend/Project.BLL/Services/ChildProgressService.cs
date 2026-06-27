@@ -141,10 +141,16 @@ public class ChildProgressService : IChildProgressService
                 string status;
                 double? score;
 
-                if (att is { IsGraded: true } && att.Score.HasValue)
+                if (att is { IsGraded: true } && att.Score.HasValue && e.IsResultPublished)
                 {
                     status = "done";
                     score = (double)att.Score.Value;
+                }
+                else if (att is { IsGraded: true } && att.Score.HasValue)
+                {
+                    // مصحَّح لكن النتيجة لم تُنشر بعد ← يظهر كـ"قيد التصحيح" بدون درجة
+                    status = "pending";
+                    score = null;
                 }
                 else if (e.StartTime.HasValue && e.StartTime.Value > DateTime.UtcNow)
                 {

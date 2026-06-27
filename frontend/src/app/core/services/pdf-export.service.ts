@@ -425,11 +425,7 @@ export class PdfExportService {
     content.push(
       { text: '', margin: [0, 10, 0, 0] },
       {
-        text: `تم إنشاء هذا التقرير في ${new Date().toLocaleDateString('ar-EG', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })}`,
+        text: `تم إنشاء هذا التقرير في ${this.formatArabicDate(new Date())}`,
         style: 'footerNote',
         alignment: 'center' as const,
       },
@@ -749,9 +745,7 @@ export class PdfExportService {
     content.push(
       { text: '', margin: [0, 10, 0, 0] },
       {
-        text: `تم إنشاء هذا التقرير في ${new Date().toLocaleDateString('ar-EG', {
-          year: 'numeric', month: 'long', day: 'numeric',
-        })}`,
+        text: `تم إنشاء هذا التقرير في ${this.formatArabicDate(new Date())}`,
         style: 'footerNote',
         alignment: 'center' as const,
       },
@@ -981,7 +975,7 @@ export class PdfExportService {
 
         for (const exam of child.upcomingExams) {
           const dateStr = exam.startTime
-            ? new Date(exam.startTime).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })
+            ? this.formatShortArabicDate(new Date(exam.startTime))
             : '—';
           upcRows.push([
             { text: dateStr, alignment: 'center' as const },
@@ -1083,9 +1077,7 @@ export class PdfExportService {
     content.push(
       { text: '', margin: [0, 10, 0, 0] },
       {
-        text: `تم إنشاء هذا التقرير في ${new Date().toLocaleDateString('ar-EG', {
-          year: 'numeric', month: 'long', day: 'numeric',
-        })}`,
+        text: `تم إنشاء هذا التقرير في ${this.formatArabicDate(new Date())}`,
         style: 'footerNote',
         alignment: 'center' as const,
       },
@@ -1133,6 +1125,29 @@ export class PdfExportService {
   }
 
   // ── Helpers ──
+
+  /**
+   * Formats a date in Arabic with Western digits (0‑9) to avoid BIDI
+   * reversal of Eastern Arabic numerals in pdfmake‑rtl RTL mode.
+   *
+   * Produces e.g. "27 يونيو 2026" instead of "٢٧ يونيو ٢٠٢٦".
+   */
+  private formatArabicDate(date: Date): string {
+    const months = [
+      'يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+    ];
+    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  }
+
+  /** Short form, e.g. "27 يونيو" (day + short month name). */
+  private formatShortArabicDate(date: Date): string {
+    const shortMonths = [
+      'يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+    ];
+    return `${date.getDate()} ${shortMonths[date.getMonth()]}`;
+  }
 
   private tableLayout(headerColor: string, altRowColor = '#f5f5f5') {
     return {
