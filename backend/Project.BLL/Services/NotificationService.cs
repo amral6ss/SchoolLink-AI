@@ -14,8 +14,7 @@ public class NotificationService : INotificationService
     private readonly IMapper _mapper;
     private readonly INotificationPushService _pushService;
 
-    private static readonly TimeZoneInfo _cairoZone = TimeZoneInfo.FindSystemTimeZoneById(
-        OperatingSystem.IsWindows() ? "Egypt Standard Time" : "Africa/Cairo");
+
 
     public NotificationService(IUnitOfWork unitOfWork, IMapper mapper, INotificationPushService pushService)
     {
@@ -24,25 +23,7 @@ public class NotificationService : INotificationService
         _pushService = pushService;
     }
 
-    /// <summary>
-    /// يحوّل وقت UTC المخزّن في الداتا بيز إلى توقيت القاهرة
-    /// (نفس منطق ExamManagerService.FormatCairoTime)
-    /// </summary>
-    private static DateTime UtcToCairo(DateTime utcTime)
-    {
-        var utc = DateTime.SpecifyKind(utcTime, DateTimeKind.Utc);
-        return TimeZoneInfo.ConvertTimeFromUtc(utc, _cairoZone);
-    }
 
-    /// <summary>
-    /// يطبّق تحويل التوقيت على DTO بعد الـ Mapping
-    /// </summary>
-    private void ApplyCairoTime(NotificationDto dto)
-    {
-        dto.CreatedAt = UtcToCairo(dto.CreatedAt);
-        if (dto.ReadAt.HasValue)
-            dto.ReadAt = UtcToCairo(dto.ReadAt.Value);
-    }
 
     public async Task<OperationResult> SendNotificationAsync(SendNotificationRequest request)
     {
@@ -56,7 +37,6 @@ public class NotificationService : INotificationService
 
         // Real-time push
         var dto = _mapper.Map<NotificationDto>(notification);
-        ApplyCairoTime(dto);
         await _pushService.PushToUserAsync(request.UserId, dto);
 
         return OperationResult.Success("تم إرسال الإشعار بنجاح");
@@ -76,7 +56,6 @@ public class NotificationService : INotificationService
 
         var dtos = _mapper.Map<IEnumerable<NotificationDto>>(notifications
             .OrderByDescending(n => n.CreatedAt));
-        foreach (var dto in dtos) ApplyCairoTime(dto);
 
         return OperationResult<IEnumerable<NotificationDto>>.Success(dtos);
     }
@@ -88,7 +67,6 @@ public class NotificationService : INotificationService
             return OperationResult<NotificationDto>.Failure("الإشعار غير موجود أو لا يخص هذا المستخدم");
 
         var dto = _mapper.Map<NotificationDto>(notification);
-        ApplyCairoTime(dto);
         return OperationResult<NotificationDto>.Success(dto);
     }
 
@@ -131,7 +109,6 @@ public class NotificationService : INotificationService
         var notifications = await _unitOfWork.Notifications.GetByUserIdPagedAsync(userId, filter.Page, filter.PageSize);
         var totalCount = await _unitOfWork.Notifications.CountAsync(n => n.UserId == userId);
         var dtos = _mapper.Map<IEnumerable<NotificationDto>>(notifications);
-        foreach (var dto in dtos) ApplyCairoTime(dto);
 
         var paged = new PagedResult<NotificationDto>
         {
@@ -177,7 +154,6 @@ public class NotificationService : INotificationService
             try
             {
                 var dto = _mapper.Map<NotificationDto>(n);
-                ApplyCairoTime(dto);
                 await _pushService.PushToUserAsync(n.UserId, dto);
             }
             catch (Exception ex)
