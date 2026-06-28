@@ -752,7 +752,7 @@ export class UserManagement implements OnInit {
     this.userService.createUser({
       fullName: this.formName(),
       username: this.formUsername(),
-      contactEmail: this.formUsername(),
+      contactEmail: undefined,
       password: this.formPassword(),
       phone: this.formPhone() || undefined,
       role: this.formRole()
@@ -828,8 +828,21 @@ export class UserManagement implements OnInit {
   }
 
   private extractErrorMessage(err: unknown, fallback: string): string {
-    const error = err as { message?: string };
-    return error?.message || fallback;
+    const httpError = err as any;
+    if (httpError?.error?.message) {
+      return httpError.error.message;
+    }
+    if (httpError?.error?.errors) {
+      const errors = httpError.error.errors;
+      const firstKey = Object.keys(errors)[0];
+      if (firstKey && Array.isArray(errors[firstKey]) && errors[firstKey].length > 0) {
+        return errors[firstKey][0];
+      }
+    }
+    if (typeof httpError?.error === 'string') {
+      return httpError.error;
+    }
+    return httpError?.message || fallback;
   }
 
   private escapeHtml(value: string): string {
