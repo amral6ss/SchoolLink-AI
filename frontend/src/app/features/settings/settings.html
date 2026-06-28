@@ -46,7 +46,7 @@
                 <span class="material-symbols-outlined">layers</span>
                 {{ gradeLevels().length }} مرحلة / صف
               </span>
-              <span class="meta-role-badge">{{ activeTab() === 'academic' ? 'الأكاديمية' : activeTab() === 'permissions' ? 'الصلاحيات' : activeTab() === 'school' ? 'المدرسة' : 'النتائج' }}</span>
+              <span class="meta-role-badge">{{ activeTab() === 'academic' ? 'الأكاديمية' : activeTab() === 'school' ? 'المدرسة' : 'النتائج' }}</span>
             </div>
           </div>
         </div>
@@ -68,19 +68,7 @@
           </span>
         </button>
 
-        <button type="button"
-                role="tab"
-                (click)="activeTab.set('permissions')"
-                [class.is-active]="activeTab() === 'permissions'"
-                class="settings-tab-btn">
-          <span class="settings-tab-icon">
-            <span class="material-symbols-outlined">verified_user</span>
-          </span>
-          <span class="settings-tab-copy">
-            <span class="settings-tab-title">الصلاحيات</span>
-            <span class="settings-tab-sub">أدوار المستخدمين والوصول</span>
-          </span>
-        </button>
+
 
         <button type="button"
                 role="tab"
@@ -117,79 +105,7 @@
         <span>{{ successMessage() }}</span>
       </div>
 
-      <!-- ═════════════ PERMISSIONS TAB ═════════════ -->
-      <ng-container *ngIf="activeTab() === 'permissions'">
 
-        <section class="profile-panel anim-card" style="--card-delay:0.05s">
-          <div class="panel-title">
-            <div class="panel-icon-wrap">
-              <span class="material-symbols-outlined">shield_person</span>
-            </div>
-            <div>
-              <p class="panel-eyebrow">التحكم في الوصول</p>
-              <h2>الصلاحيات وأدوار المستخدمين</h2>
-            </div>
-          </div>
-          <p class="panel-desc">قم بإدارة مستويات الوصول والتحكم في الميزات لكل فئة من مستخدمي النظام.</p>
-
-          <div class="settings-table-wrap">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm text-right">
-                <thead class="settings-table-head">
-                  <tr>
-                    <th class="px-6 py-4">الوحدة / القسم</th>
-                    <th class="px-6 py-4 text-center">مدير النظام</th>
-                    <th class="px-6 py-4 text-center">معلم</th>
-                    <th class="px-6 py-4 text-center">ولي أمر</th>
-                    <th class="px-6 py-4 text-center">طالب</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr class="settings-table-row">
-                    <td class="px-6 py-4 font-bold text-blue-700 flex items-center gap-2 whitespace-nowrap">
-                      <span class="material-symbols-outlined text-base">dashboard</span> لوحة القيادة الرئيسية
-                    </td>
-                    <td class="px-6 py-4 text-center"><span class="material-symbols-outlined text-emerald-500" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
-                    <td class="px-6 py-4 text-center"><span class="material-symbols-outlined text-emerald-500" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
-                    <td class="px-6 py-4 text-center"><span class="material-symbols-outlined text-emerald-500" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
-                    <td class="px-6 py-4 text-center"><span class="material-symbols-outlined text-gray-300">circle</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="settings-action-row">
-            <button class="profile-secondary" type="button">إلغاء</button>
-            <button class="profile-primary" type="button">
-              <span class="btn-shimmer"></span>
-              <span class="material-symbols-outlined">save</span>
-              حفظ التغييرات
-            </button>
-          </div>
-        </section>
-
-        <section class="profile-panel anim-card" style="--card-delay:0.15s">
-          <div class="panel-title">
-            <div class="panel-icon-wrap panel-icon-purple">
-              <span class="material-symbols-outlined">smart_toy</span>
-            </div>
-            <div>
-              <p class="panel-eyebrow">الميزات الذكية</p>
-              <h2>مساعد الذكاء الاصطناعي</h2>
-            </div>
-          </div>
-
-          <div class="settings-toggle-row">
-            <p class="toggle-text">تفعيل الدردشة الآلية لأولياء الأمور.</p>
-            <label class="settings-switch">
-              <input checked class="sr-only" type="checkbox" />
-              <span class="settings-switch-track"></span>
-            </label>
-          </div>
-        </section>
-
-      </ng-container>
 
       <!-- ═════════════ RESULTS VISIBILITY TAB ═════════════ -->
       <ng-container *ngIf="activeTab() === 'results'">
